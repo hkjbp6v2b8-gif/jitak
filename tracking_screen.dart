@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'rating_screen.dart';
 
 class TrackingScreen extends StatelessWidget {
-  const TrackingScreen({Key? key}) : super(key: key);
+  final double tripFare;
+
+  const TrackingScreen({Key? key, this.tripFare = 15.0}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    double commission = tripFare * 0.10; // نسبة 10%
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('تتبع الرحلة'),
@@ -15,7 +19,6 @@ class TrackingScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // محاكاة لخريطة التتبع
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -23,20 +26,22 @@ class TrackingScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.teal.shade200),
                 ),
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.map, size: 80, color: Colors.teal),
-                      SizedBox(height: 10),
-                      Text('خريطة التتبع المباشر (قريباً)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const Icon(Icons.map, size: 80, color: Colors.teal),
+                      const SizedBox(height: 10),
+                      const Text('خريطة التتبع المباشر', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text('قيمة الرحلة الحالية: ${tripFare.toStringAsFixed(1)} د.ل', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('عمولة التطبيق (10%): +${commission.toStringAsFixed(2)} د.ل', style: const TextStyle(color: Colors.red, fontSize: 13)),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            // بطاقة معلومات السائق والرحلة
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -76,7 +81,9 @@ class TrackingScreen extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              // الانتقال لشاشة التقييم عند إنهاء الرحلة
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('تم إتمام الرحلة بنجاح! تم احتساب عمولة 10% (${commission.toStringAsFixed(2)} د.ل).')),
+                              );
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(builder: (context) => const RatingScreen()),
