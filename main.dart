@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'home_screen.dart';
 import 'driver_screen.dart';
 
@@ -18,7 +19,7 @@ class JitakApp extends StatelessWidget {
         primarySwatch: Colors.teal,
         fontFamily: 'Cairo',
       ),
-      // هنا نجعل الصفحة الرئيسية تعرض زر للتنقل بين الشاشتين بسهولة
+      // جعل شاشة تسجيل الدخول هي الشاشة البداية
       home: const MainNavigationScreen(),
     );
   }
@@ -31,7 +32,7 @@ class MainNavigationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تطبيق جِيتك - القائمة الرئيسية'),
+        title: const Text('تطبيق جِيتك'),
         backgroundColor: Colors.teal,
         centerTitle: true,
       ),
@@ -46,34 +47,48 @@ class MainNavigationScreen extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 40),
-            ElevatedButton.styleFrom().let((_) => ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('دخول واجهة العميل', style: TextStyle(fontSize: 18, color: Colors.white)),
-                )),
-            const SizedBox(height: 20),
-            ElevatedButton.styleFrom().let((_) => ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DriverScreen()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepOrange,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('دخول لوحة السائق', style: TextStyle(fontSize: 18, color: Colors.white)),
-                )),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('تسجيل الدخول', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 15),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.tealDark,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('دخول واجهة العميل (معاينة)', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 15),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DriverScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepOrange,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('دخول لوحة السائق (معاينة)', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
           ],
         ),
       ),
