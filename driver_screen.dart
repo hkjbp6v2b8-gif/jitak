@@ -9,48 +9,96 @@ class DriverScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('جِيتك - لوحة السائق'),
         backgroundColor: Colors.deepOrange,
-        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            tooltip: 'تسجيل الخروج',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Card(
-              color: Colors.orangeAccent,
+            // حالة السائق (متصل / استلام الطلبات)
+            SwitchListTile(
+              title: const Text('أنت متصل الآن (جاهز للرحلات)', style: TextStyle(fontWeight: FontWeight.bold)),
+              value: true,
+              activeColor: Colors.deepOrange,
+              onChanged: (bool value) {},
+            ),
+            const Divider(height: 30),
+            const Text(
+              'الطلبات المتاحة بالقرب منك:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            // بطاقة طلب رحلة وهمية
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('الحالة: متصل وجاهز للطلبات', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Icon(Icons.check_circle, color: Colors.white),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.between,
+                      children: [
+                        Text('طلب رحلة جديد', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.deepOrange)),
+                        Text('على بُعد 1.2 كم', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Row(
+                      children: [
+                        Icon(Icons.my_location, size: 18, color: Colors.teal),
+                        SizedBox(width: 8),
+                        Text('من: جزيرة المشرق'),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Row(
+                      children: [
+                        Icon(Icons.location_on, size: 18, color: Colors.redAccent),
+                        SizedBox(width: 8),
+                        Text('إلى: وسط المدينة'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم رفض الطلب')),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('رفض'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم قبول الرحلة بنجاح!')),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+                            child: const Text('قبول الطلب', style: TextStyle(color: Colors.white)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'الطلبات القريبة منك:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                children: [
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.local_shipping, color: Colors.deepOrange),
-                      title: const Text('طلب توصيل طرد - وسط المدينة'),
-                      subtitle: const Text(' المسافة: 2.5 كم | السعر: 15 د.ل'),
-                      trailing: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
-                        child: const Text('قبول', style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
