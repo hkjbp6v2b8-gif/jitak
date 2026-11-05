@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package me/flutter/material.dart';
 import 'tracking_screen.dart';
 import 'ride_history_screen.dart';
 
@@ -11,10 +11,49 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _destinationController = TextEditingController();
-  String _selectedPaymentMethod = 'نقداً (كاش)';
-  double _estimatedFare = 15.0;
+  final TextEditingController _promoController = TextEditingController();
 
-  // دالة لعرض إشعار الطلب الوارد للسائق (محاكاة حية)
+  String _selectedPaymentMethod = 'نقداً (كاش)';
+  double _baseFare = 15.0;
+  double _discountAmount = 0.0;
+  String _appliedPromoCode = '';
+
+  // دالة لتطبيق كود الخصم
+  void _applyPromoCode() {
+    FocusScope.of(context).unfocus();
+    String code = _promoController.text.trim().toUpperCase();
+
+    if (code == 'JITAK10' || code == 'WELCOME') {
+      setState(() {
+        _discountAmount = 3.0; // خصم 3 دينار
+        _appliedPromoCode = code;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم تطبيق الكوبون ($code) بنجاح! تم خصم 3.0 د.ل'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى إدخال كود الخصم أولاً.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('كود الخصم غير صحيح أو منتهي الصلاحية!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  double get _finalFare {
+    double fare = _baseFare - _discountAmount;
+    return fare > 0 ? fare : 0.0;
+  }
+
+  // دالة لعرض إشعار الطلب الوارد للسائق
   void _simulateDriverIncomingRequest(BuildContext context) {
     showDialog(
       context: context,
@@ -35,7 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text('الوجهة: ${_destinationController.text}', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('التكلفة المقدرة: ${_estimatedFare.toStringAsFixed(1)} د.ل'),
+              Text('التكلفة النهائية: ${_finalFare.toStringAsFixed(1)} د.ل'),
+              if (_discountAmount > 0)
+                Text('تم خصم ${_discountAmount.toStringAsFixed(1)} د.ل بكوبون ($_appliedPromoCode)', style: const TextStyle(color: Colors.green, fontSize: 12)),
               const SizedBox(height: 8),
               Text('طريقة الدفع: $_selectedPaymentMethod'),
             ],
@@ -43,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // إغلاق الإشعار (رفض الطلب)
+                Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('تم رفض الطلب.')),
                 );
@@ -52,12 +93,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // إغلاق الإشعار
-                // الانتقال لشاشة تتبع الرحلة
+                Navigator.of(context).pop();
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TrackingScreen(tripFare: _estimatedFare),
+                    builder: (context) => TrackingScreen(tripFare: _finalFare),
                   ),
                 );
               },
@@ -96,13 +136,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 180,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(16),
@@ -112,96 +153,138 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.location_on, size: 70, color: Colors.teal),
-                      SizedBox(height: 10),
+                      Icon(Icons.location_on, size: 60, color: Colors.teal),
+                      SizedBox(height: 8),
                       Text('أنت هنا (موقعك الحالي)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'إلى أين تريد الذهاب؟',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _destinationController,
-                      decoration: InputDecoration(
-                        hintText: 'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
-                        prefixIcon: const Icon(Icons.search, color: Colors.teal),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إلى أين تريد الذهاب؟',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _estimatedFare = 12.0 + (value.length * 1.5);
-                          if (_estimatedFare > 45.0) _estimatedFare = 45.0;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.between,
-                      children: [
-                        const Text('التكلفة التقديرية:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                        Text('${_estimatedFare.toStringAsFixed(1)} د.ل', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
-                      ],
-                    ),
-                    const Divider(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.between,
-                      children: [
-                        const Text('طريقة الدفع:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        DropdownButton<String>(
-                          value: _selectedPaymentMethod,
-                          items: <String>['نقداً (كاش)', 'محفظة إلكترونية'].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedPaymentMethod = newValue!;
-                            });
-                          },
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _destinationController,
+                        decoration: InputDecoration(
+                          hintText: 'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
+                          prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (_destinationController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('الرجاء إدخال وجهتك أولاً!')),
-                          );
-                          return;
-                        }
-                        // إظهار إشعار الطلب الوارد للسائق
-                        _simulateDriverIncomingRequest(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        minimumSize: const Size(double.infinity, 50),
+                        onChanged: (value) {
+                          setState(() {
+                            _baseFare = 12.0 + (value.length * 1.5);
+                            if (_baseFare > 45.0) _baseFare = 45.0;
+                          });
+                        },
                       ),
-                      child: const Text('بحث عن كابتن الآن', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      
+                      // حقل كود الخصم (الكوبون)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _promoController,
+                              decoration: InputDecoration(
+                                hintText: 'كود الخصم (جرّب WELCOME)',
+                                prefixIcon: const Icon(Icons.card_giftcard, color: Colors.teal),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _applyPromoCode,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('تطبيق', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // عرض التكلفة بعد الخصم
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.between,
+                        children: [
+                          const Text('التكلفة التقديرية:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (_discountAmount > 0)
+                                Text(
+                                  '${_baseFare.toStringAsFixed(1)} د.ل',
+                                  style: const TextStyle(fontSize: 14, decoration: TextDecoration.lineThrough, color: Colors.grey),
+                                ),
+                              Text(
+                                '${_finalFare.toStringAsFixed(1)} د.ل',
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.between,
+                        children: [
+                          const Text('طريقة الدفع:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          DropdownButton<String>(
+                            value: _selectedPaymentMethod,
+                            items: <String>['نقداً (كاش)', 'محفظة إلكترونية'].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                _selectedPaymentMethod = newValue!;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_destinationController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('الرجاء إدخال وجهتك أولاً!')),
+                            );
+                            return;
+                          }
+                          _simulateDriverIncomingRequest(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
+                        child: const Text('بحث عن كابتن الآن', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
