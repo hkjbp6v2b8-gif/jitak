@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'ride_history_screen.dart';
 import 'settings_screen.dart';
+import 'tracking_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -90,8 +91,9 @@ class HomeScreen extends StatelessWidget {
             const Spacer(),
             ElevatedButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('جارٍ البحث عن أقرب سائق لك...')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TrackingScreen()),
                 );
               },
               icon: const Icon(Icons.local_taxi, color: Colors.white),
