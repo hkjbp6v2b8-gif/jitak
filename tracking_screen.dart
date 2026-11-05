@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'rating_screen.dart';
 
 class TrackingScreen extends StatelessWidget {
   const TrackingScreen({Key? key}) : super(key: key);
@@ -53,7 +54,7 @@ class TrackingScreen extends StatelessWidget {
                     ),
                     const Divider(),
                     const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.between,
                       children: [
                         Text('حالة الرحلة:', style: TextStyle(color: Colors.grey)),
                         Text('السائق في الطريق إليك', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
@@ -71,16 +72,18 @@ class TrackingScreen extends StatelessWidget {
                             label: const Text('إلغاء الرحلة', style: TextStyle(color: Colors.red)),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('جارٍ الاتصال بالسائق...')),
+                              // الانتقال لشاشة التقييم عند إنهاء الرحلة
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => const RatingScreen()),
                               );
                             },
-                            icon: const Icon(Icons.phone, color: Colors.white),
-                            label: const Text('اتصال', style: TextStyle(color: Colors.white)),
+                            icon: const Icon(Icons.check_circle, color: Colors.white),
+                            label: const Text('إتمام الرحلة', style: TextStyle(color: Colors.white, fontSize: 13)),
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                           ),
                         ),
