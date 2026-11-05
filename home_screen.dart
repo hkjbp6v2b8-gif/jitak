@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
-import 'ride_history_screen.dart';
-import 'settings_screen.dart';
 import 'tracking_screen.dart';
+import 'ride_history_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _destinationController = TextEditingController();
+  String _selectedPaymentMethod = 'نقداً (كاش)';
+  double _estimatedFare = 15.0; // التكلفة الافتراضية للرحلة
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('جِيتك - طلب رحلة'),
+        title: const Text('جِيتك - اطلب مشوارك'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
@@ -24,16 +32,6 @@ class HomeScreen extends StatelessWidget {
             tooltip: 'تاريخ الرحلات',
           ),
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-            tooltip: 'الإعدادات',
-          ),
-          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               Navigator.pop(context);
@@ -43,88 +41,118 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Card(
-              color: Colors.tealAccent,
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  'إلى أين تريد الذهاب اليوم؟',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
-                  textAlign: TextAlign.center,
+            // محاكاة الخريطة في الواجهة الرئيسية
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.location_on, size: 70, color: Colors.teal),
+                      SizedBox(height: 10),
+                      Text('أنت هنا (موقعك الحالي)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'موقع الانطلاق الحاضر',
-                prefixIcon: const Icon(Icons.my_location, color: Colors.teal),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'إلى أين؟ (حدد الوجهة)',
-                prefixIcon: const Icon(Icons.location_on, color: Colors.redAccent),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'اختر نوع الرحلة:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildRideOption(Icons.directions_car, 'اقتصادية', 'توفير'),
-                _buildRideOption(Icons.local_taxi, 'عائلية', 'مساحة أكثر'),
-                _buildRideOption(Icons.star, 'ممتازة', 'سيارات حديثة'),
-              ],
-            ),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TrackingScreen()),
-                );
-              },
-              icon: const Icon(Icons.local_taxi, color: Colors.white),
-              label: const Text('تأكيد طلب الرحلة', style: TextStyle(fontSize: 18, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // بطاقة طلب الرحلة وإدخال الوجهة
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'إلى أين تريد الذهاب؟',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _destinationController,
+                      decoration: InputDecoration(
+                        hintText: 'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
+                        prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onChanged: (value) {
+                        // محاكاة تغيير التكلفة بناءً على الوجهة
+                        setState(() {
+                          _estimatedFare = 12.0 + (value.length * 1.5);
+                          if (_estimatedFare > 45.0) _estimatedFare = 45.0;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.between,
+                      children: [
+                        const Text('التكلفة التقديرية:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        Text('${_estimatedFare.toStringAsFixed(1)} د.ل', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.between,
+                      children: [
+                        const Text('طريقة الدفع:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        DropdownButton<String>(
+                          value: _selectedPaymentMethod,
+                          items: <String>['نقداً (كاش)', 'محفظة إلكترونية'].map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedPaymentMethod = newValue!;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_destinationController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('الرجاء إدخال وجهتك أولاً!')),
+                          );
+                          return;
+                        }
+                        // الانتقال لشاشة تتبع الرحلة والبحث عن كابتن
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TrackingScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child: const Text('بحث عن كابتن الآن', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRideOption(IconData icon, String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.teal, size: 36),
-          const SizedBox(height: 6),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        ],
       ),
     );
   }
