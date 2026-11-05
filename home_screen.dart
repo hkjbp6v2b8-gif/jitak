@@ -14,6 +14,62 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedPaymentMethod = 'نقداً (كاش)';
   double _estimatedFare = 15.0;
 
+  // دالة لعرض إشعار الطلب الوارد للسائق (محاكاة حية)
+  void _simulateDriverIncomingRequest(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.notifications_active, color: Colors.teal),
+              SizedBox(width: 8),
+              Text('طلب رحلة جديد!'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الوجهة: ${_destinationController.text}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('التكلفة المقدرة: ${_estimatedFare.toStringAsFixed(1)} د.ل'),
+              const SizedBox(height: 8),
+              Text('طريقة الدفع: $_selectedPaymentMethod'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق الإشعار (رفض الطلب)
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم رفض الطلب.')),
+                );
+              },
+              child: const Text('رفض', style: TextStyle(color: Colors.red)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق الإشعار
+                // الانتقال لشاشة تتبع الرحلة
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TrackingScreen(tripFare: _estimatedFare),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+              child: const Text('قبول الرحلة', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,12 +186,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                           return;
                         }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TrackingScreen(tripFare: _estimatedFare),
-                          ),
-                        );
+                        // إظهار إشعار الطلب الوارد للسائق
+                        _simulateDriverIncomingRequest(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
