@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'driver_profile_screen.dart';
 
 class DriverScreen extends StatelessWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -10,6 +11,16 @@ class DriverScreen extends StatelessWidget {
         title: const Text('جِيتك - لوحة السائق'),
         backgroundColor: Colors.deepOrange,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DriverProfileScreen()),
+              );
+            },
+            tooltip: 'الملف الشخصي',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -24,7 +35,6 @@ class DriverScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // حالة السائق (متصل / استلام الطلبات)
             SwitchListTile(
               title: const Text('أنت متصل الآن (جاهز للرحلات)', style: TextStyle(fontWeight: FontWeight.bold)),
               value: true,
@@ -37,7 +47,6 @@ class DriverScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 12),
-            // بطاقة طلب رحلة وهمية
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
