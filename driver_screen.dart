@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'driver_profile_screen.dart';
+import 'driver_wallet_screen.dart'; // تم ربط شاشة المحفظة هنا
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -22,6 +23,18 @@ class _DriverScreenState extends State<DriverScreen> {
         title: const Text('لوحة تحكم السائق - جِيتك'),
         backgroundColor: Colors.teal,
         actions: [
+          // زر الانتقال للمحفظة والأرباح
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DriverWalletScreen()),
+              );
+            },
+            tooltip: 'المحفظة والأرباح',
+          ),
+          // زر الملف الشخصي
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
@@ -32,6 +45,7 @@ class _DriverScreenState extends State<DriverScreen> {
             },
             tooltip: 'الملف الشخصي',
           ),
+          // زر تسجيل الخروج
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
