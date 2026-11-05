@@ -19,51 +19,75 @@
             width: 100%;
             max-width: 400px;
             height: 100%;
-            max-height: 800px;
+            max-height: 850px;
             background: white;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            border-radius: 12px;
         }
         .header {
-            background-color: #2c3e50;
+            background-color: #1e293b;
             color: white;
-            padding: 20px;
+            padding: 18px;
             text-align: center;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
         }
         .content {
             padding: 20px;
             flex: 1;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
         }
         .btn {
             width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            background-color: #3498db;
+            padding: 14px;
+            margin: 8px 0;
+            background-color: #2563eb;
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             font-weight: bold;
+            transition: 0.2s;
         }
         .btn:active {
-            background-color: #2980b9;
+            background-color: #1d4ed8;
+        }
+        .btn-success {
+            background-color: #16a34a;
+        }
+        .btn-success:active {
+            background-color: #15803d;
+        }
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: right;
         }
         .footer {
-            padding: 15px;
+            padding: 12px;
             text-align: center;
-            color: #7f8c8d;
-            font-size: 14px;
-            border-top: 1px solid #ecf0f1;
+            color: #64748b;
+            font-size: 13px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
         }
     </style>
 </head>
@@ -71,29 +95,57 @@
 
     <div class="app-container">
         <div class="header">جِيتك | Jitak</div>
-        <div class="content" id="main-content">
-            <h2>مرحباً بك في تطبيق جِيتك</h2>
-            <p>منصة النقل والخدمات الذكية الخاصة بك.</p>
-            <button class="btn" onclick="openDriverScreen()">تسجيل دخول كـ سائق</button>
-            <button class="btn" onclick="openCustomerScreen()" style="background-color: #2ecc71;">تسجيل دخول كـ عميل</button>
+        <div class="content" id="app-view">
+            <!-- الشاشة الرئيسية -->
+            <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center;">
+                <h2>مرحباً بك في تطبيق جِيتك</h2>
+                <p style="color: #64748b; margin-bottom: 30px;">منصة النقل والخدمات الذكية الخاصة بك.</p>
+                <button class="btn" onclick="showLogin('driver')">تسجيل دخول كـ سائق</button>
+                <button class="btn btn-success" onclick="showLogin('customer')">تسجيل دخول كـ عميل</button>
+            </div>
         </div>
         <div class="footer">جميع الحقوق محفوظة © 2026 Jitak</div>
     </div>
 
     <script>
-        function openDriverScreen() {
-            document.getElementById('main-content').innerHTML = `
-                <h2>شاشة السائق</h2>
-                <p>مرحباً بك، جاهز لاستقبال الطلبات والرحلات.</p>
-                <button class="btn" onclick="location.reload()">العودة للرئيسية</button>
+        function showLogin(type) {
+            const title = type === 'driver' ? 'تسجيل دخول السائق' : 'تسجيل دخول العميل';
+            document.getElementById('app-view').innerHTML = `
+                <h2>${title}</h2>
+                <p style="color: #64748b;">الرجاء إدخال بيانات حسابك للمتابعة.</p>
+                <input type="text" class="input-field" placeholder="رقم الهاتف أو البريد الإلكتروني">
+                <input type="password" class="input-field" placeholder="كلمة المرور">
+                <button class="btn" onclick="showDashboard('${type}')">دخول</button>
+                <button class="btn" style="background-color: #64748b;" onclick="location.reload()">العودة للرئيسية</button>
             `;
         }
-        function openCustomerScreen() {
-            document.getElementById('main-content').innerHTML = `
-                <h2>شاشة العميل</h2>
-                <p>اطلب وجهتك بكل سهولة ويسر.</p>
-                <button class="btn" onclick="location.reload()">العودة للرئيسية</button>
-            `;
+
+        function showDashboard(type) {
+            if (type === 'driver') {
+                document.getElementById('app-view').innerHTML = `
+                    <h2>شاشة السائق الرئيسية</h2>
+                    <div class="card">
+                        <strong>حالة الطوارئ / الخدمة:</strong>
+                        <p style="margin: 5px 0 0; color: #16a34a;">متصل وجاهز لاستقبال الطلبات</p>
+                    </div>
+                    <div class="card">
+                        <strong>الطلبات القريبة:</strong>
+                        <p style="margin: 5px 0 0; color: #64748b;">لا توجد رحلات جديدة حالياً</p>
+                    </div>
+                    <button class="btn btn-success" onclick="alert('تم تحديث الحالة بنجاح!')">تحديث الحالة</button>
+                    <button class="btn" style="background-color: #dc2626;" onclick="location.reload()">تسجيل الخروج</button>
+                `;
+            } else {
+                document.getElementById('app-view').innerHTML = `
+                    <h2>شاشة العميل</h2>
+                    <div class="card">
+                        <strong>إلى أين تريد الذهاب اليوم؟</strong>
+                        <input type="text" class="input-field" placeholder="أدخل الوجهة أو الموقع الحالي">
+                    </div>
+                    <button class="btn btn-success" onclick="alert('جاري البحث عن أقرب سائق متاح...')">اطلب رحلتك الآن</button>
+                    <button class="btn" style="background-color: #dc2626;" onclick="location.reload()">تسجيل الخروج</button>
+                `;
+            }
         }
     </script>
 </body>
