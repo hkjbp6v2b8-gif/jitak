@@ -8,63 +8,108 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final TextEditingController _nameController = TextEditingController(text: 'أحمد المحمودي');
+  final TextEditingController _phoneController = TextEditingController(text: '+218 91 123 4567');
+  final TextEditingController _emailController = TextEditingController(text: 'ahmed@jitak.ly');
+
   bool _notificationsEnabled = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الإعدادات والدعم'),
+        title: const Text('الملف الشخصي والإعدادات'),
         backgroundColor: Colors.teal,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          const Text(
-            'عام',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-          const SizedBox(height: 10),
-          SwitchListTile(
-            title: const Text('التنبيهات والإشعارات'),
-            subtitle: const Text('استلام تحديثات الرحلات والحالات'),
-            value: _notificationsEnabled,
-            activeColor: Colors.teal,
-            onChanged: (bool value) {
-              setState(() {
-                _notificationsEnabled = value;
-              });
-            },
-          ),
-          const Divider(),
-          const ListTile(
-            leading: Icon(Icons.language, color: Colors.teal),
-            title: Text('اللغة'),
-            subtitle: Text('العربية'),
-          ),
-          const Divider(),
-          const SizedBox(height: 10),
-          const Text(
-            'المساعدة والدعم',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-          const SizedBox(height: 10),
-          ListTile(
-            leading: const Icon(Icons.headset_mic, color: Colors.teal),
-            title: const Text('التواصل مع الدعم الفني'),
-            subtitle: const Text('مساعدة على مدار 24 ساعة'),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('جارٍ فتح خدمة العملاء...')),
-              );
-            },
-          ),
-          const ListTile(
-            leading: Icon(Icons.info_outline, color: Colors.teal),
-            title: Text('عن التطبيق'),
-            subtitle: Text('تطبيق جِيتك الإصدار 1.0.0'),
-          ),
-        ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            // صورة الملف الشخصي
+            const Center(
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.teal,
+                    child: Icon(Icons.person, size: 60, color: Colors.white),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.camera_alt, size: 18, color: Colors.teal),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // حقول تعديل البيانات
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'الاسم بالكامل',
+                prefixIcon: const Icon(Icons.person_outline, color: Colors.teal),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'رقم الهاتف',
+                prefixIcon: const Icon(Icons.phone_android, color: Colors.teal),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'البريد الإلكتروني',
+                prefixIcon: const Icon(Icons.email_outlined, color: Colors.teal),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // خيار التنبيهات الإشعارات
+            SwitchListTile(
+              activeColor: Colors.teal,
+              title: const Text('تفعيل التنبيهات والإشعارات', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('استلام تحديثات الرحلات والعروض'),
+              value: _notificationsEnabled,
+              onChanged: (bool value) {
+                setState(() {
+                  _notificationsEnabled = value;
+                });
+              },
+            ),
+            const Divider(height: 32),
+
+            // زر حفظ التغييرات
+            ElevatedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم حفظ البيانات والتغييرات بنجاح!')),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text('حفظ التغييرات', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
