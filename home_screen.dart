@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ride_history_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -11,7 +12,6 @@ class HomeScreen extends StatelessWidget {
         title: const Text('جِيتك - طلب رحلة'),
         backgroundColor: Colors.teal,
         actions: [
-          // زر تاريخ الرحلات الجديد
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
@@ -21,6 +21,16 @@ class HomeScreen extends StatelessWidget {
               );
             },
             tooltip: 'تاريخ الرحلات',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+            tooltip: 'الإعدادات',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
