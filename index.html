@@ -1,13 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
-  <base href="/jitak/">
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <title>jitak</title>
-  <link rel="manifest" href="manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق جِيتك - Jitak</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+            height: 100%;
+            max-height: 800px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:active {
+            background-color: #2980b9;
+        }
+        .footer {
+            padding: 15px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 14px;
+            border-top: 1px solid #ecf0f1;
+        }
+    </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+
+    <div class="app-container">
+        <div class="header">جِيتك | Jitak</div>
+        <div class="content" id="main-content">
+            <h2>مرحباً بك في تطبيق جِيتك</h2>
+            <p>منصة النقل والخدمات الذكية الخاصة بك.</p>
+            <button class="btn" onclick="openDriverScreen()">تسجيل دخول كـ سائق</button>
+            <button class="btn" onclick="openCustomerScreen()" style="background-color: #2ecc71;">تسجيل دخول كـ عميل</button>
+        </div>
+        <div class="footer">جميع الحقوق محفوظة © 2026 Jitak</div>
+    </div>
+
+    <script>
+        function openDriverScreen() {
+            document.getElementById('main-content').innerHTML = `
+                <h2>شاشة السائق</h2>
+                <p>مرحباً بك، جاهز لاستقبال الطلبات والرحلات.</p>
+                <button class="btn" onclick="location.reload()">العودة للرئيسية</button>
+            `;
+        }
+        function openCustomerScreen() {
+            document.getElementById('main-content').innerHTML = `
+                <h2>شاشة العميل</h2>
+                <p>اطلب وجهتك بكل سهولة ويسر.</p>
+                <button class="btn" onclick="location.reload()">العودة للرئيسية</button>
+            `;
+        }
+    </script>
 </body>
 </html>
