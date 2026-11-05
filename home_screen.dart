@@ -12,7 +12,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _destinationController = TextEditingController();
   String _selectedPaymentMethod = 'نقداً (كاش)';
-  double _estimatedFare = 15.0; // التكلفة الافتراضية للرحلة
+  double _estimatedFare = 15.0;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // محاكاة الخريطة في الواجهة الرئيسية
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -66,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // بطاقة طلب الرحلة وإدخال الوجهة
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -88,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onChanged: (value) {
-                        // محاكاة تغيير التكلفة بناءً على الوجهة
                         setState(() {
                           _estimatedFare = 12.0 + (value.length * 1.5);
                           if (_estimatedFare > 45.0) _estimatedFare = 45.0;
@@ -133,10 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                           return;
                         }
-                        // الانتقال لشاشة تتبع الرحلة والبحث عن كابتن
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const TrackingScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => TrackingScreen(tripFare: _estimatedFare),
+                          ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
