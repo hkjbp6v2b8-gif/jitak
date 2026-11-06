@@ -119,14 +119,33 @@
         <div class="footer">جميع الحقوق محفوظة © 2026 Jitak</div>
     </div>
 
+    <!-- استدعاء وتجهيز Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCq14cu4ax2Tww5GnSy3Su...",
+            authDomain: "jitak-4cef2.firebaseapp.com",
+            projectId: "jitak-4cef2",
+            storageBucket: "jitak-4cef2.appspot.com",
+            messagingSenderId: "110836240327",
+            appId: "1:110836240327:web:db899a15f..."
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window.firebaseAuth = auth;
+    </script>
+
     <script>
         function showLogin(type) {
             const title = type === 'driver' ? 'تسجيل دخول السائق' : 'تسجيل دخول العميل';
             document.getElementById('app-view').innerHTML = `
                 <h2>${title}</h2>
                 <p style="color: #64748b;">أدخل بيانات حسابك للمتابعة.</p>
-                <input type="text" class="input-field" placeholder="📱 رقم الهاتف">
-                <input type="password" class="input-field" placeholder="🔒 كلمة المرور">
+                <input type="text" id="phone" class="input-field" placeholder="📱 رقم الهاتف">
+                <input type="password" id="password" class="input-field" placeholder="🔒 كلمة المرور">
                 <button class="btn" onclick="showDashboard('${type}')">تسجيل الدخول</button>
                 <button class="btn" style="background-color: #64748b;" onclick="location.reload()">العودة للرئيسية</button>
             `;
