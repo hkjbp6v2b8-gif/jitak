@@ -1,6 +1,7 @@
-import 'package me/flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'tracking_screen.dart';
 import 'ride_history_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -17,6 +18,13 @@ class _HomeScreenState extends State<HomeScreen> {
   double _baseFare = 15.0;
   double _discountAmount = 0.0;
   String _appliedPromoCode = '';
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    _promoController.dispose();
+    super.dispose();
+  }
 
   // دالة لتطبيق كود الخصم
   void _applyPromoCode() {
@@ -53,12 +61,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return fare > 0 ? fare : 0.0;
   }
 
-  // دالة لعرض إشعار الطلب الوارد للسائق
+  // دالة لعرض إشعار الطلب الوارد للسائق (محاكاة)
   void _simulateDriverIncomingRequest(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
@@ -72,11 +80,15 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('الوجهة: ${_destinationController.text}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('الوجهة: ${_destinationController.text}',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text('التكلفة النهائية: ${_finalFare.toStringAsFixed(1)} د.ل'),
               if (_discountAmount > 0)
-                Text('تم خصم ${_discountAmount.toStringAsFixed(1)} د.ل بكوبون ($_appliedPromoCode)', style: const TextStyle(color: Colors.green, fontSize: 12)),
+                Text(
+                  'تم خصم ${_discountAmount.toStringAsFixed(1)} د.ل بكوبون ($_appliedPromoCode)',
+                  style: const TextStyle(color: Colors.green, fontSize: 12),
+                ),
               const SizedBox(height: 8),
               Text('طريقة الدفع: $_selectedPaymentMethod'),
             ],
@@ -84,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('تم رفض الطلب.')),
                 );
@@ -93,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -102,7 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              child: const Text('قبول الرحلة', style: TextStyle(color: Colors.white)),
+              child: const Text('قبول الرحلة',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -122,10 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const RideHistoryScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const RideHistoryScreen()),
               );
             },
             tooltip: 'تاريخ الرحلات',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+            tooltip: 'الإعدادات',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -155,7 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Icon(Icons.location_on, size: 60, color: Colors.teal),
                       SizedBox(height: 8),
-                      Text('أنت هنا (موقعك الحالي)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      Text('أنت هنا (موقعك الحالي)',
+                          style: TextStyle(
+                              color: Colors.grey, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -163,7 +189,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               Card(
                 elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -171,15 +198,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       const Text(
                         'إلى أين تريد الذهاب؟',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _destinationController,
                         decoration: InputDecoration(
-                          hintText: 'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
-                          prefixIcon: const Icon(Icons.search, color: Colors.teal),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          hintText:
+                              'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
+                          prefixIcon:
+                              const Icon(Icons.search, color: Colors.teal),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         onChanged: (value) {
                           setState(() {
@@ -189,7 +220,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
                       // حقل كود الخصم (الكوبون)
                       Row(
                         children: [
@@ -198,9 +228,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               controller: _promoController,
                               decoration: InputDecoration(
                                 hintText: 'كود الخصم (جرّب WELCOME)',
-                                prefixIcon: const Icon(Icons.card_giftcard, color: Colors.teal),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                prefixIcon: const Icon(Icons.card_giftcard,
+                                    color: Colors.teal),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                               ),
                             ),
                           ),
@@ -209,31 +242,42 @@ class _HomeScreenState extends State<HomeScreen> {
                             onPressed: _applyPromoCode,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.teal,
-                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('تطبيق', style: TextStyle(color: Colors.white)),
+                            child: const Text('تطبيق',
+                                style: TextStyle(color: Colors.white)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-
                       // عرض التكلفة بعد الخصم
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('التكلفة التقديرية:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const Text('التكلفة التقديرية:',
+                              style: TextStyle(
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.bold)),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               if (_discountAmount > 0)
                                 Text(
                                   '${_baseFare.toStringAsFixed(1)} د.ل',
-                                  style: const TextStyle(fontSize: 14, decoration: TextDecoration.lineThrough, color: Colors.grey),
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.grey),
                                 ),
                               Text(
                                 '${_finalFare.toStringAsFixed(1)} د.ل',
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal),
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.teal),
                               ),
                             ],
                           ),
@@ -241,20 +285,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const Divider(height: 24),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('طريقة الدفع:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text('طريقة الدفع:',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                           DropdownButton<String>(
                             value: _selectedPaymentMethod,
-                            items: <String>['نقداً (كاش)', 'محفظة إلكترونية'].map((String value) {
+                            items: <String>['نقداً (كاش)', 'محفظة إلكترونية']
+                                .map((String value) {
                               return DropdownMenuItem<String>(
                                 value: value,
                                 child: Text(value),
                               );
                             }).toList(),
                             onChanged: (String? newValue) {
+                              if (newValue == null) return;
                               setState(() {
-                                _selectedPaymentMethod = newValue!;
+                                _selectedPaymentMethod = newValue;
                               });
                             },
                           ),
@@ -263,9 +310,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
-                          if (_destinationController.text.isEmpty) {
+                          if (_destinationController.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('الرجاء إدخال وجهتك أولاً!')),
+                              const SnackBar(
+                                  content: Text('الرجاء إدخال وجهتك أولاً!')),
                             );
                             return;
                           }
@@ -274,10 +322,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                           minimumSize: const Size(double.infinity, 50),
                         ),
-                        child: const Text('بحث عن كابتن الآن', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: const Text('بحث عن كابتن الآن',
+                            style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
