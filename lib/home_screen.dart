@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('جِيتك - اطلب مشوارك'),
+        title: const Text('اطلب مشوارك'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
@@ -205,8 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       TextField(
                         controller: _destinationController,
                         decoration: InputDecoration(
-                          hintText:
-                              'اكتب وجهتك (مثلاً: ميدان الشهداء، قرقارش...)',
+                          hintText: 'اكتب وجهتك هنا',
                           prefixIcon:
                               const Icon(Icons.search, color: Colors.teal),
                           border: OutlineInputBorder(
@@ -227,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: TextField(
                               controller: _promoController,
                               decoration: InputDecoration(
-                                hintText: 'كود الخصم (جرّب WELCOME)',
+                                hintText: 'كود الخصم',
                                 prefixIcon: const Icon(Icons.card_giftcard,
                                     color: Colors.teal),
                                 border: OutlineInputBorder(
