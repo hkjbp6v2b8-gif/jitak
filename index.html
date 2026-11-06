@@ -73,6 +73,7 @@
             border-radius: 8px;
             box-sizing: border-box;
             font-size: 15px;
+            text-align: center;
         }
         .card {
             background: #f8fafc;
@@ -111,18 +112,21 @@
             <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center;">
                 <h2>مرحباً بك في تطبيق جِيتك</h2>
                 <p style="color: #64748b; margin-bottom: 25px;">منصة النقل والخدمات الذكية المتكاملة.</p>
-                <button class="btn" onclick="showLogin('driver')">🚗 تسجيل دخول كـ سائق</button>
-                <button class="btn btn-success" onclick="showLogin('customer')">👤 تسجيل دخول كـ عميل</button>
+                <button class="btn" onclick="showPhoneLogin('driver')">🚗 تسجيل دخول كـ سائق</button>
+                <button class="btn btn-success" onclick="showPhoneLogin('customer')">👤 تسجيل دخول كـ عميل</button>
             </div>
         </div>
 
         <div class="footer">جميع الحقوق محفوظة © 2026 Jitak</div>
     </div>
 
-    <!-- استدعاء وتجهيز Firebase SDK -->
+    <!-- عنصر مخفي لدعم التحقق برقم الهاتف عبر Firebase -->
+    <div id="recaptcha-container"></div>
+
+    <!-- استدعاء وتجهيز Firebase SDK والمصادقة -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCq14cu4ax2Tww5GnSy3Su...",
@@ -136,19 +140,69 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         window.firebaseAuth = auth;
+        window.RecaptchaVerifier = RecaptchaVerifier;
+        window.signInWithPhoneNumber = signInWithPhoneNumber;
     </script>
 
     <script>
-        function showLogin(type) {
+        let userTypeGlobal = 'customer';
+
+        function showPhoneLogin(type) {
+            userTypeGlobal = type;
             const title = type === 'driver' ? 'تسجيل دخول السائق' : 'تسجيل دخول العميل';
             document.getElementById('app-view').innerHTML = `
                 <h2>${title}</h2>
-                <p style="color: #64748b;">أدخل بيانات حسابك للمتابعة.</p>
-                <input type="text" id="phone" class="input-field" placeholder="📱 رقم الهاتف">
-                <input type="password" id="password" class="input-field" placeholder="🔒 كلمة المرور">
-                <button class="btn" onclick="showDashboard('${type}')">تسجيل الدخول</button>
+                <p style="color: #64748b;">أدخل رقم هاتفك مع الرمز الدولي (مثال: +218...)</p>
+                <input type="text" id="phone-number" class="input-field" placeholder="+218 91 XXXXXXX">
+                <button class="btn" onclick="sendVerificationCode()">إرسال رمز التحقق</button>
                 <button class="btn" style="background-color: #64748b;" onclick="location.reload()">العودة للرئيسية</button>
             `;
+        }
+
+        function sendVerificationCode() {
+            const phoneNumber = document.getElementById('phone-number').value;
+            if(!phoneNumber) {
+                alert('الرجاء إدخال رقم الهاتف صحيحاً');
+                return;
+            }
+
+            // تفعيل التحقق برقم الهاتف عبر Firebase Auth
+            window.recaptchaVerifier = new window.RecaptchaVerifier(window.firebaseAuth, 'recaptcha-container', {
+                'size': 'invisible'
+            });
+
+            window.signInWithPhoneNumber(window.firebaseAuth, phoneNumber, window.recaptchaVerifier)
+                .then((confirmationResult) => {
+                    window.confirmationResult = confirmationResult;
+                    showOtpVerificationScreen();
+                }).catch((error) => {
+                    alert('خطأ في إرسال الرمز: ' + error.message);
+                });
+        }
+
+        function showOtpVerificationScreen() {
+            document.getElementById('app-view').innerHTML = `
+                <h2>رمز التحقق</h2>
+                <p style="color: #64748b;">أدخل الرمز المكون من 6 أرقام المرسل إلى هاتفك.</p>
+                <input type="text" id="otp-code" class="input-field" placeholder="------" maxlength="6">
+                <button class="btn btn-success" onclick="verifyOtpCode()">تأكيد وتسجيل الدخول</button>
+                <button class="btn" style="background-color: #64748b;" onclick="location.reload()">إلغاء</button>
+            `;
+        }
+
+        function verifyOtpCode() {
+            const code = document.getElementById('otp-code').value;
+            if(!code) {
+                alert('الرجاء إدخال رمز التحقق');
+                return;
+            }
+
+            window.confirmationResult.confirm(code).then((result) => {
+                // تم تسجيل الدخول بنجاح
+                showDashboard(userTypeGlobal);
+            }).catch((error) => {
+                alert('رمز التحقق غير صحيح، حاول مرة أخرى.');
+            });
         }
 
         function showDashboard(type) {
@@ -156,7 +210,7 @@
                 document.getElementById('app-view').innerHTML = `
                     <h2>لوحة تحكم السائق</h2>
                     <div class="card">
-                        <strong>🟢 حالة الاتصال:</strong> متصل وجاهز للطلبات
+                        <strong>🟢 حالة الاتصال:</strong> متصل وجاهز للطلبات (مُثبت عبر Firebase)
                     </div>
                     <div class="nav-grid">
                         <button class="btn btn-success" onclick="showScreen('driver_orders')">📦 الطلبات</button>
@@ -171,7 +225,7 @@
                     <h2>شاشة العميل الرئيسية</h2>
                     <div class="card">
                         <strong>📍 حدد وجهتك:</strong>
-                        <input type="text" class="input-field" placeholder="أدخل موقع التوصيل أو الوجهة">
+                        <input type="text" class="input-field" placeholder="أدخل موقع التوصيل أو الوجهة" style="text-align: right;">
                     </div>
                     <div class="nav-grid">
                         <button class="btn btn-success" onclick="alert('جاري البحث عن أقرب كابتن...')">🚖 اطلب رحلة الآن</button>
@@ -189,7 +243,7 @@
             if (screen === 'driver_orders') {
                 content = `
                     <h2>📦 طلبات التوصيل المتاحة</h2>
-                    <div class="card"><strong>الطلب #102:</strong> طريق الشط - توصيل طرد (15 د.ل)<br><button class="btn btn-success" style="margin-top:8px;" onclick="alert('تم قبول الطلب بنجاح!')">قبول الطلب</button></div>
+                    <div class="card"><strong>الطلب #102:</strong> سوق الجمعة - توصيل طرد (15 د.ل)<br><button class="btn btn-success" style="margin-top:8px;" onclick="alert('تم قبول الطلب بنجاح!')">قبول الطلب</button></div>
                 `;
             } else if (screen === 'driver_wallet') {
                 content = `
@@ -204,7 +258,7 @@
             } else if (screen === 'ride_history') {
                 content = `
                     <h2>📜 الرحلات السابقة</h2>
-                    <div class="card">رحلة إلى وسط البلاد - مكتملة</div>
+                    <div class="card">رحلة إلى سوق الجمعة - مكتملة</div>
                 `;
             } else if (screen === 'tracking') {
                 content = `
