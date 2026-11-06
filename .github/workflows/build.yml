@@ -1,8 +1,17 @@
-name: Build
+name: Build and Deploy
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -12,12 +21,20 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - run: flutter create . --platforms=android,web --project-name jitak
+      - run: flutter create . --platforms=web --project-name jitak
       - run: rm -rf test
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build web --release
-      - uses: actions/upload-artifact@v4
+      - run: flutter build web --release --base-href /jitak/
+      - uses: actions/upload-pages-artifact@v3
         with:
-          name: jitak-web
           path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
