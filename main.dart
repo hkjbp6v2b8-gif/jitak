@@ -19,7 +19,13 @@ class JitakApp extends StatelessWidget {
         primarySwatch: Colors.teal,
         fontFamily: 'Cairo',
       ),
-      // جعل شاشة تسجيل الدخول هي الشاشة البداية
+      // اتجاه التطبيق من اليمين لليسار
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        );
+      },
       home: const MainNavigationScreen(),
     );
   }
@@ -43,7 +49,7 @@ class MainNavigationScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'أهلاً بك في تطبيق جِيتك للتوصيل',
+              'أهلاً بك في تطبيق جِيتك',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
@@ -59,7 +65,8 @@ class MainNavigationScreen extends StatelessWidget {
                 backgroundColor: Colors.teal,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('تسجيل الدخول', style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: const Text('تسجيل الدخول',
+                  style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
             const SizedBox(height: 15),
             ElevatedButton(
@@ -70,10 +77,11 @@ class MainNavigationScreen extends StatelessWidget {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealDark,
+                backgroundColor: Colors.teal.shade800,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('دخول واجهة العميل (معاينة)', style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: const Text('دخول واجهة العميل (معاينة)',
+                  style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
             const SizedBox(height: 15),
             ElevatedButton(
@@ -87,7 +95,8 @@ class MainNavigationScreen extends StatelessWidget {
                 backgroundColor: Colors.deepOrange,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('دخول لوحة السائق (معاينة)', style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: const Text('دخول لوحة السائق (معاينة)',
+                  style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
           ],
         ),
