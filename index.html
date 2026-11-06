@@ -108,7 +108,6 @@
         </div>
         
         <div class="content" id="app-view">
-            <!-- شاشة الترحيب الرئيسية -->
             <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center;">
                 <div style="font-size: 50px; margin-bottom: 10px;">🛺</div>
                 <h2>أهلاً بك في تطبيق جِيتك</h2>
@@ -121,21 +120,20 @@
         <div class="footer">جميع الحقوق محفوظة © 2026 Jitak</div>
     </div>
 
-    <!-- عنصر حماية reCAPTCHA الخاص بـ Firebase -->
     <div id="recaptcha-container"></div>
 
-    <!-- مكتبات Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+        // المفاتيح الخاصة بك من الصورة
         const firebaseConfig = {
-            apiKey: "AIzaSyCq14cu4ax2Tww5GnSy3Su...",
+            apiKey: "AIzaSyCq14cu4ax2Tww5GnSy3SuvA5aj0nsirmc",
             authDomain: "jitak-4cef2.firebaseapp.com",
             projectId: "jitak-4cef2",
-            storageBucket: "jitak-4cef2.appspot.com",
+            storageBucket: "jitak-4cef2.firebasestorage.app",
             messagingSenderId: "110836240327",
-            appId: "1:110836240327:web:db899a15f..."
+            appId: "1:110836240327:web:db899a15fa4613304613e2"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -169,4 +167,131 @@
 
         function sendVerificationCode() {
             const phoneInput = document.getElementById('phone-number');
-            const phoneNumber = phoneInput ? phoneInput.value.trim()
+            const phoneNumber = phoneInput ? phoneInput.value.trim() : '';
+
+            if(!phoneNumber) {
+                alert('الرجاء إدخال رقم الهاتف أولاً');
+                return;
+            }
+
+            try {
+                if (!window.recaptchaVerifier) {
+                    window.recaptchaVerifier = new window.RecaptchaVerifier(window.firebaseAuth, 'recaptcha-container', {
+                        'size': 'invisible'
+                    });
+                }
+
+                window.signInWithPhoneNumber(window.firebaseAuth, phoneNumber, window.recaptchaVerifier)
+                    .then((confirmationResult) => {
+                        window.confirmationResult = confirmationResult;
+                        showOtpVerificationScreen(phoneNumber);
+                    }).catch((error) => {
+                        alert('تنبيه Firebase: ' + error.message);
+                    });
+            } catch(e) {
+                alert('حدث خطأ في الاتصال: ' + e.message);
+            }
+        }
+
+        function showOtpVerificationScreen(phone) {
+            document.getElementById('app-view').innerHTML = `
+                <div style="text-align: center; font-size: 40px; margin-top: 20px;">📲</div>
+                <h2 style="text-align: center;">رمز التحقق (OTP)</h2>
+                <p style="text-align: center; color: #64748b;">أدخل الرمز المكون من 6 أرقام المرسل إلى الرقم:<br><strong>${phone}</strong></p>
+                
+                <input type="text" id="otp-code" class="input-field" placeholder="------" maxlength="6" style="font-size: 24px; letter-spacing: 5px;">
+                
+                <button class="btn btn-success" style="margin-top: 15px;" onclick="verifyOtpCode()">تأكيد وتسجيل الدخول</button>
+                <button class="btn" style="background-color: #64748b;" onclick="location.reload()">إلغاء</button>
+            `;
+        }
+
+        function verifyOtpCode() {
+            const code = document.getElementById('otp-code').value.trim();
+            if(!code || code.length < 6) {
+                alert('الرجاء إدخال رمز التحقق المكون من 6 أرقام');
+                return;
+            }
+
+            window.confirmationResult.confirm(code).then((result) => {
+                showDashboard(currentRole);
+            }).catch((error) => {
+                alert('رمز التحقق غير صحيح، يرجى إعادة المحاولة.');
+            });
+        }
+
+        function showDashboard(role) {
+            if (role === 'driver') {
+                document.getElementById('app-view').innerHTML = `
+                    <h2>لوحة تحكم السائق</h2>
+                    <div class="card">
+                        <strong>🟢 حالة الاتصال:</strong> متصل وجاهز (تم التحقق عبر Firebase)
+                    </div>
+                    <div class="nav-grid">
+                        <button class="btn btn-success" onclick="showScreen('driver_orders')">📦 الطلبات</button>
+                        <button class="btn" onclick="showScreen('driver_wallet')">💰 المحفظة</button>
+                        <button class="btn" onclick="showScreen('driver_profile')">👤 الملف الشخصي</button>
+                        <button class="btn" style="background-color: #475569;" onclick="showScreen('settings')">⚙️ الإعدادات</button>
+                    </div>
+                    <button class="btn btn-danger" style="margin-top: 20px;" onclick="location.reload()">تسجيل الخروج</button>
+                `;
+            } else {
+                document.getElementById('app-view').innerHTML = `
+                    <h2>شاشة العميل الرئيسية</h2>
+                    <div class="card">
+                        <strong>📍 حدد وجهتك:</strong>
+                        <input type="text" class="input-field" placeholder="أدخل موقع التوصيل أو الوجهة" style="text-align: right;">
+                    </div>
+                    <div class="nav-grid">
+                        <button class="btn btn-success" onclick="alert('جاري البحث عن أقرب كابتن...')">🚖 اطلب رحلة الآن</button>
+                        <button class="btn" onclick="showScreen('ride_history')">📜 رحلاتي السابقة</button>
+                        <button class="btn" onclick="showScreen('tracking')">🗺️ تتبع الرحلة</button>
+                        <button class="btn" style="background-color: #475569;" onclick="showScreen('settings')">⚙️ الإعدادات</button>
+                    </div>
+                    <button class="btn btn-danger" style="margin-top: 20px;" onclick="location.reload()">تسجيل الخروج</button>
+                `;
+            }
+        }
+
+        function showScreen(screen) {
+            let content = '';
+            if (screen === 'driver_orders') {
+                content = `
+                    <h2>📦 طلبات التوصيل المتاحة</h2>
+                    <div class="card"><strong>الطلب #102:</strong> سوق الجمعة - توصيل طرد (15 د.ل)<br><button class="btn btn-success" style="margin-top:8px;" onclick="alert('تم قبول الطلب بنجاح!')">قبول الطلب</button></div>
+                `;
+            } else if (screen === 'driver_wallet') {
+                content = `
+                    <h2>💰 محفظة السائق</h2>
+                    <div class="card" style="text-align:center;">إجمالي الأرباح: <strong style="color:#16a34a; font-size:18px;">240.00 د.ل</strong></div>
+                `;
+            } else if (screen === 'driver_profile') {
+                content = `
+                    <h2>👤 ملف السائق</h2>
+                    <div class="card">الاسم: سائق جِيتك<br>التقييم: ⭐ 4.9<br>المركبة: سيارة خاصة</div>
+                `;
+            } else if (screen === 'ride_history') {
+                content = `
+                    <h2>📜 الرحلات السابقة</h2>
+                    <div class="card">رحلة إلى سوق الجمعة - مكتملة</div>
+                `;
+            } else if (screen === 'tracking') {
+                content = `
+                    <h2>🗺️ تتبع الرحلة الحية</h2>
+                    <div class="card" style="text-align:center; padding: 30px;">[ خريطة التتبع المباشر مفعلة ]</div>
+                `;
+            } else if (screen === 'settings') {
+                content = `
+                    <h2>⚙️ الإعدادات العامة</h2>
+                    <div class="card">اللغة: العربية (AR)<br>الإشعارات: مفعلة</div>
+                `;
+            }
+
+            document.getElementById('app-view').innerHTML = `
+                ${content}
+                <button class="btn" style="background-color: #64748b; margin-top: 15px;" onclick="location.reload()">العودة للوحة التحكم</button>
+            `;
+        }
+    </script>
+</body>
+</html>
