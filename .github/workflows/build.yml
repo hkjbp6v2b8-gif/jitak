@@ -1,0 +1,23 @@
+name: Build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create . --platforms=android,web --project-name jitak
+      - run: rm -rf test
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter build web --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jitak-web
+          path: build/web
