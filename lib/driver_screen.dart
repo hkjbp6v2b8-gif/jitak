@@ -20,7 +20,7 @@ class _DriverScreenState extends State<DriverScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة تحكم السائق - جِيتك'),
+        title: const Text('لوحة السائق'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
