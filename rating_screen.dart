@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class RatingScreen extends StatefulWidget {
-  const RatingScreen({Key? key}) : super(key: key);
+  final double tripFare;
+
+  const RatingScreen({Key? key, required this.tripFare}) : super(key: key);
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -9,6 +11,13 @@ class RatingScreen extends StatefulWidget {
 
 class _RatingScreenState extends State<RatingScreen> {
   int _rating = 5;
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,16 +27,18 @@ class _RatingScreenState extends State<RatingScreen> {
         backgroundColor: Colors.teal,
         automaticallyImplyLeading: false, // لمنع العودة للخلف قبل التقييم
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.tealAccent,
-              child: Icon(Icons.check, size: 50, color: Colors.teal),
+            const SizedBox(height: 20),
+            const Center(
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.tealAccent,
+                child: Icon(Icons.check, size: 50, color: Colors.teal),
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -37,14 +48,17 @@ class _RatingScreenState extends State<RatingScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'نتمنى أن تكون قد استمتعت برحلتك مع الكابتن أحمد.',
+              'نتمنى أن تكون قد استمتعت برحلتك مع الكابتن محمد علي.',
               style: TextStyle(color: Colors.grey, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            const Text(
-              'إجمالي التكلفة: 15 د.ل',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal),
+            Text(
+              'إجمالي التكلفة: ${widget.tripFare.toStringAsFixed(1)} د.ل',
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
@@ -74,9 +88,11 @@ class _RatingScreenState extends State<RatingScreen> {
             ),
             const SizedBox(height: 30),
             TextField(
+              controller: _notesController,
               decoration: InputDecoration(
                 hintText: 'اكتب ملاحظاتك (اختياري)...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               maxLines: 2,
             ),
@@ -84,7 +100,9 @@ class _RatingScreenState extends State<RatingScreen> {
             ElevatedButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('شكراً لتقييمك! تم إغلاق الرحلة بنجاح.')),
+                  const SnackBar(
+                      content:
+                          Text('شكراً لتقييمك! تم إغلاق الرحلة بنجاح.')),
                 );
                 // العودة لشاشة العميل الرئيسية
                 Navigator.pop(context);
@@ -92,9 +110,11 @@ class _RatingScreenState extends State<RatingScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('إرسال التقييم والعودة للرئيسية', style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: const Text('إرسال التقييم والعودة للرئيسية',
+                  style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],
         ),
