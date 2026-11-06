@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'driver_profile_screen.dart';
-import 'driver_wallet_screen.dart'; // تم ربط شاشة المحفظة هنا
+import 'driver_wallet_screen.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -23,29 +23,28 @@ class _DriverScreenState extends State<DriverScreen> {
         title: const Text('لوحة تحكم السائق - جِيتك'),
         backgroundColor: Colors.teal,
         actions: [
-          // زر الانتقال للمحفظة والأرباح
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const DriverWalletScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const DriverWalletScreen()),
               );
             },
             tooltip: 'المحفظة والأرباح',
           ),
-          // زر الملف الشخصي
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const DriverProfileScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const DriverProfileScreen()),
               );
             },
             tooltip: 'الملف الشخصي',
           ),
-          // زر تسجيل الخروج
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -60,7 +59,7 @@ class _DriverScreenState extends State<DriverScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // بطاقة إدارة الرصيد والديون (نظام توربو)
+            // بطاقة إدارة الرصيد والديون
             Card(
               elevation: 4,
               color: isBlocked ? Colors.red.shade50 : Colors.teal.shade50,
@@ -77,14 +76,17 @@ class _DriverScreenState extends State<DriverScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.between,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
                           'محفظة العمولة والديون',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Icon(
-                          isBlocked ? Icons.warning_amber_rounded : Icons.account_balance_wallet,
+                          isBlocked
+                              ? Icons.warning_amber_rounded
+                              : Icons.account_balance_wallet,
                           color: isBlocked ? Colors.red : Colors.teal,
                         ),
                       ],
@@ -99,7 +101,9 @@ class _DriverScreenState extends State<DriverScreen> {
                     ),
                     const SizedBox(height: 6),
                     LinearProgressIndicator(
-                      value: _currentDebt / _maxDebtLimit,
+                      value: (_currentDebt / _maxDebtLimit)
+                          .clamp(0.0, 1.0)
+                          .toDouble(),
                       backgroundColor: Colors.grey.shade300,
                       color: isBlocked ? Colors.red : Colors.teal,
                     ),
@@ -107,7 +111,10 @@ class _DriverScreenState extends State<DriverScreen> {
                     if (isBlocked)
                       const Text(
                         'تنبيه: تجاوزت الحد الأقصى للديون (30 د.ل). تم ايقاف استقبال الرحلات حتى تسديد الدين.',
-                        style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold),
                       )
                     else
                       const Text(
@@ -117,17 +124,21 @@ class _DriverScreenState extends State<DriverScreen> {
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: () {
-                        // محاكاة تسديد الديون وشحن الرصيد
+                        // محاكاة تسديد الديون (سيُربط بالخادم لاحقاً)
                         setState(() {
                           _currentDebt = 0.0;
                           _isOnline = true;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('تم تسديد الدين بنجاح! تم تفعيل الحساب.')),
+                          const SnackBar(
+                              content: Text(
+                                  'تم تسديد الدين بنجاح! تم تفعيل الحساب.')),
                         );
                       },
-                      icon: const Icon(Icons.payment, color: Colors.white, size: 18),
-                      label: const Text('تسديد الدين وتعبئة الرصيد', style: TextStyle(color: Colors.white)),
+                      icon: const Icon(Icons.payment,
+                          color: Colors.white, size: 18),
+                      label: const Text('تسديد الدين وتعبئة الرصيد',
+                          style: TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isBlocked ? Colors.red : Colors.teal,
                         minimumSize: const Size(double.infinity, 36),
@@ -140,12 +151,17 @@ class _DriverScreenState extends State<DriverScreen> {
             const SizedBox(height: 20),
             // حالة الاتصال وقبول الرحلات
             SwitchListTile(
-              title: const Text('أنت متصل الآن لاستقبال الرحلات', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(isBlocked ? 'متوقف تلقائياً بسبب الديون' : (_isOnline ? 'تستقبل طلبات الزبائن حالياً' : 'أنت في وضع عدم الاتصال')),
+              title: const Text('أنت متصل الآن لاستقبال الرحلات',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(isBlocked
+                  ? 'متوقف تلقائياً بسبب الديون'
+                  : (_isOnline
+                      ? 'تستقبل طلبات الزبائن حالياً'
+                      : 'أنت في وضع عدم الاتصال')),
               value: isBlocked ? false : _isOnline,
               activeColor: Colors.teal,
               onChanged: isBlocked
-                  ? null // منع التغيير إذا كان الحساب موقوفاً بسبب الدين
+                  ? null
                   : (bool value) {
                       setState(() {
                         _isOnline = value;
@@ -165,11 +181,16 @@ class _DriverScreenState extends State<DriverScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.block, size: 60, color: Colors.grey.shade400),
+                          Icon(Icons.block,
+                              size: 60, color: Colors.grey.shade400),
                           const SizedBox(height: 10),
                           Text(
-                            isBlocked ? 'الحساب موقوف مؤقتاً لتجاوز الدين' : 'أنت غير متصل حالياً',
-                            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                            isBlocked
+                                ? 'الحساب موقوف مؤقتاً لتجاوز الدين'
+                                : 'أنت غير متصل حالياً',
+                            style: const TextStyle(
+                                color: Colors.grey,
+                                fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -183,16 +204,21 @@ class _DriverScreenState extends State<DriverScreen> {
                               backgroundColor: Colors.tealAccent,
                               child: Icon(Icons.person, color: Colors.teal),
                             ),
-                            title: const Text('رحلة إلى: ميدان الشهداء', style: TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: const Text('المسافة: 3.5 كم • التكلفة: 15 د.ل'),
+                            title: const Text('رحلة إلى: ميدان الشهداء',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: const Text(
+                                'المسافة: 3.5 كم • التكلفة: 15 د.ل'),
                             trailing: ElevatedButton(
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('تم قبول الرحلة بنجاح!')),
+                                  const SnackBar(
+                                      content: Text('تم قبول الرحلة بنجاح!')),
                                 );
                               },
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                              child: const Text('قبول', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal),
+                              child: const Text('قبول',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                           ),
                         ),
