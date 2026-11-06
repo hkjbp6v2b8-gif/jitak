@@ -29,33 +29,51 @@ class DriverWalletScreen extends StatelessWidget {
                   children: [
                     Text(
                       'إجمالي أرباح اليوم',
-                      style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 8),
                     Text(
                       '125.00 د.ل',
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.teal),
+                      style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal),
                     ),
                     Divider(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Column(
-                          children: [
-                            Text('رحلات اليوم', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            SizedBox(height: 4),
-                            Text('8 رحلات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          ],
-                        ),
-                        VerticalDivider(),
-                        Column(
-                          children: [
-                            Text('أرباح الأسبوع', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            SizedBox(height: 4),
-                            Text('840.00 د.ل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          ],
-                        ),
-                      ],
+                    IntrinsicHeight(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Column(
+                            children: [
+                              Text('رحلات اليوم',
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12)),
+                              SizedBox(height: 4),
+                              Text('8 رحلات',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                            ],
+                          ),
+                          VerticalDivider(),
+                          Column(
+                            children: [
+                              Text('أرباح الأسبوع',
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12)),
+                              SizedBox(height: 4),
+                              Text('840.00 د.ل',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -78,9 +96,14 @@ class DriverWalletScreen extends StatelessWidget {
                         backgroundColor: Colors.tealAccent,
                         child: Icon(Icons.arrow_downward, color: Colors.teal),
                       ),
-                      title: Text('رحلة توصيل #1042', style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text('رحلة توصيل #1042',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('العميل: محمد علي • اليوم، 04:30 م'),
-                      trailing: Text('+ 18.00 د.ل', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 15)),
+                      trailing: Text('+ 18.00 د.ل',
+                          style: TextStyle(
+                              color: Colors.teal,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15)),
                     ),
                   ),
                   Card(
@@ -90,9 +113,14 @@ class DriverWalletScreen extends StatelessWidget {
                         backgroundColor: Colors.tealAccent,
                         child: Icon(Icons.arrow_downward, color: Colors.teal),
                       ),
-                      title: Text('رحلة توصيل #1041', style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text('رحلة توصيل #1041',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('العميل: أحمد حسن • اليوم، 02:15 م'),
-                      trailing: Text('+ 22.00 د.ل', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 15)),
+                      trailing: Text('+ 22.00 د.ل',
+                          style: TextStyle(
+                              color: Colors.teal,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15)),
                     ),
                   ),
                   Card(
@@ -102,9 +130,14 @@ class DriverWalletScreen extends StatelessWidget {
                         backgroundColor: Colors.redAccent,
                         child: Icon(Icons.payment, color: Colors.white),
                       ),
-                      title: Text('تسديد عمولة التطبيق', style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text('تسديد عمولة التطبيق',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('تحويل رصيد / دفع مباشر • الأمس'),
-                      trailing: Text('- 15.00 د.ل', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                      trailing: Text('- 15.00 د.ل',
+                          style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15)),
                     ),
                   ),
                 ],
