@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'tracking_screen.dart';
 import 'ride_history_screen.dart';
 import 'settings_screen.dart';
+import 'map_screen.dart'; // تم استدعاء ملف الخريطة الحقيقية هنا
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -127,8 +128,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('اطلب مشوارك'),
+        title: const Text('اطلب مشوارك - جِيتك'),
         backgroundColor: Colors.teal,
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -166,23 +168,37 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.teal.shade200),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.location_on, size: 60, color: Colors.teal),
-                      SizedBox(height: 8),
-                      Text('أنت هنا (موقعك الحالي)',
-                          style: TextStyle(
-                              color: Colors.grey, fontWeight: FontWeight.bold)),
-                    ],
+              // زر عرض الخريطة الحقيقية بملء الشاشة أو معاينة تفاعلية
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MapScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.teal.shade300, width: 2),
+                  ),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.map, size: 50, color: Colors.teal),
+                        SizedBox(height: 8),
+                        Text('اضغط هنا لفتح خريطة التتبع المباشر 🗺️',
+                            style: TextStyle(
+                                color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 15)),
+                        SizedBox(height: 4),
+                        Text('(تحديد موقعك الحالي في طرابلس عبر الـ GPS)',
+                            style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
                   ),
                 ),
               ),
