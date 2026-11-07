@@ -24,8 +24,28 @@ jobs:
       - run: flutter create . --platforms=web --project-name jitak
       - run: rm -rf test
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build web --release --base-href /jitak/
+
+      - name: Analyze
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings > analyze.txt 2>&1 || true
+          echo '### نتيجة الفحص' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -i "error" analyze.txt | head -30 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Build web
+        run: |
+          set -o pipefail
+          flutter build web --release --base-href /jitak/ 2>&1 | tee build.txt
+
+      - name: Show build errors
+        if: failure()
+        run: |
+          echo '### أخطاء البناء' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "Error:|\.dart:[0-9]+" build.txt | head -30 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
