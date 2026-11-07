@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'driver_profile_screen.dart';
 import 'driver_wallet_screen.dart';
 
@@ -14,6 +15,149 @@ class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
   double _currentDebt = 22.5; // بيانات تجريبية (د.ل)
   final double _maxDebtLimit = 30.0;
+
+  CollectionReference<Map<String, dynamic>> get _rides =>
+      FirebaseFirestore.instance.collection('rides');
+
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  void _msg(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _accept(String rideId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final name = (user.displayName ?? '').isEmpty ? 'الكابتن' : user.displayName;
+    try {
+      await _rides.doc(rideId).update({
+        'status': 'accepted',
+        'driverId': user.uid,
+        'driverName': name,
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) _msg('تم قبول الرحلة!');
+    } catch (_) {
+      if (mounted) _msg('تعذر قبول الرحلة (ربما قبلها سائق آخر).');
+    }
+  }
+
+  Future<void> _complete(String rideId) async {
+    try {
+      await _rides.doc(rideId).update({
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) _msg('تم إنهاء الرحلة.');
+    } catch (_) {
+      if (mounted) _msg('تعذر إنهاء الرحلة، حاول مجدداً.');
+    }
+  }
+
+  // بطاقة الرحلة الجارية
+  Widget _activeRideCard(String rideId, Map<String, dynamic> ride) {
+    final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+    return Card(
+      elevation: 4,
+      color: Colors.teal.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.teal.shade300, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('رحلة جارية',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal)),
+            const SizedBox(height: 8),
+            Text('العميل: ${(ride['customerName'] ?? '').toString()}'),
+            Text('الوجهة: ${(ride['destination'] ?? '').toString()}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('التكلفة: ${fare.toStringAsFixed(1)} د.ل'),
+            Text('الدفع: ${(ride['paymentMethod'] ?? '').toString()}'),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => _complete(rideId),
+              icon: const Icon(Icons.flag, color: Colors.white),
+              label: const Text('إنهاء الرحلة',
+                  style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                minimumSize: const Size(double.infinity, 44),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // قائمة الطلبات المفتوحة
+  Widget _requestsList() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _rides.where('status', isEqualTo: 'requested').snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return const Center(
+            child: Text('تعذر تحميل الطلبات. تحقق من الاتصال.',
+                style: TextStyle(color: Colors.grey)),
+          );
+        }
+        if (!snap.hasData) {
+          return const Center(
+              child: CircularProgressIndicator(color: Colors.teal));
+        }
+
+        final docs = snap.data!.docs.toList();
+        docs.sort((a, b) {
+          final ta = a.data()['createdAt'] as Timestamp?;
+          final tb = b.data()['createdAt'] as Timestamp?;
+          if (ta == null || tb == null) return 0;
+          return tb.compareTo(ta);
+        });
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text('لا توجد طلبات حالياً. سيظهر أي طلب جديد هنا فوراً.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey)),
+          );
+        }
+
+        return ListView(
+          children: docs.map((doc) {
+            final ride = doc.data();
+            final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+            return Card(
+              elevation: 2,
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.tealAccent,
+                  child: Icon(Icons.person, color: Colors.teal),
+                ),
+                title: Text('رحلة إلى: ${(ride['destination'] ?? '').toString()}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                    'التكلفة: ${fare.toStringAsFixed(1)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+                trailing: ElevatedButton(
+                  onPressed: () => _accept(doc.id),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  child: const Text('قبول',
+                      style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +193,6 @@ class _DriverScreenState extends State<DriverScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // تسجيل الخروج الفعلي، ثم العودة للجذر
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.of(context).popUntil((route) => route.isFirst);
@@ -122,7 +265,7 @@ class _DriverScreenState extends State<DriverScreen> {
                       )
                     else
                       const Text(
-                        'الحساب متاح لاستقبال الطلبات بشكل طبيعي.',
+                        'الحساب متاح لاستقبال الطلبات بشكل طبيعي. (الأرقام تجريبية حالياً)',
                         style: TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                     const SizedBox(height: 12),
@@ -133,11 +276,7 @@ class _DriverScreenState extends State<DriverScreen> {
                           _currentDebt = 0.0;
                           _isOnline = true;
                         });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'تم تسديد الدين بنجاح! تم تفعيل الحساب.')),
-                        );
+                        _msg('تم تسديد الدين (تجريبي).');
                       },
                       icon: const Icon(Icons.payment,
                           color: Colors.white, size: 18),
@@ -152,7 +291,7 @@ class _DriverScreenState extends State<DriverScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('أنت متصل الآن لاستقبال الرحلات',
                   style: TextStyle(fontWeight: FontWeight.bold)),
@@ -171,15 +310,24 @@ class _DriverScreenState extends State<DriverScreen> {
                       });
                     },
             ),
-            const Divider(height: 30),
-            const Text(
-              'الطلبات القريبة المتاحة:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
+            const Divider(height: 24),
             Expanded(
-              child: isBlocked || !_isOnline
-                  ? Center(
+              // الرحلة الجارية لها الأولوية، وإلا تظهر الطلبات المفتوحة
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _rides
+                    .where('driverId', isEqualTo: _uid)
+                    .where('status', isEqualTo: 'accepted')
+                    .snapshots(),
+                builder: (context, activeSnap) {
+                  if (activeSnap.hasData && activeSnap.data!.docs.isNotEmpty) {
+                    final doc = activeSnap.data!.docs.first;
+                    return SingleChildScrollView(
+                      child: _activeRideCard(doc.id, doc.data()),
+                    );
+                  }
+
+                  if (isBlocked || !_isOnline) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -196,36 +344,23 @@ class _DriverScreenState extends State<DriverScreen> {
                           ),
                         ],
                       ),
-                    )
-                  : ListView(
-                      children: [
-                        Card(
-                          elevation: 2,
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: Colors.tealAccent,
-                              child: Icon(Icons.person, color: Colors.teal),
-                            ),
-                            title: const Text('رحلة إلى: ميدان الشهداء',
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: const Text(
-                                'المسافة: 3.5 كم • التكلفة: 15 د.ل'),
-                            trailing: ElevatedButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('تم قبول الرحلة بنجاح!')),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal),
-                              child: const Text('قبول',
-                                  style: TextStyle(color: Colors.white)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'الطلبات القريبة المتاحة:',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _requestsList()),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
