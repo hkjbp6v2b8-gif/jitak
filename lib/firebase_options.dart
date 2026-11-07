@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 
 class DefaultFirebaseOptions {
-  static const FirebaseOptions currentPlatform = FirebaseOptions(
+  static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyCq14cu4ax2Tww5GnSy3SuvA5aj0nsirmc',
     authDomain: 'jitak-4cef2.firebaseapp.com',
     projectId: 'jitak-4cef2',
