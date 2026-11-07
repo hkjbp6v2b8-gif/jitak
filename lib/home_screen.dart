@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'tracking_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'ride_history_screen.dart';
 import 'settings_screen.dart';
+import 'ride_status_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -16,9 +17,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _promoController = TextEditingController();
 
   String _selectedPaymentMethod = 'نقداً (كاش)';
-  double _baseFare = 15.0;
+  double _baseFare = 15.0; // سعر تجريبي حالياً
   double _discountAmount = 0.0;
   String _appliedPromoCode = '';
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -27,101 +29,67 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // دالة لتطبيق كود الخصم
+  void _msg(String text, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: color),
+    );
+  }
+
   void _applyPromoCode() {
     FocusScope.of(context).unfocus();
-    String code = _promoController.text.trim().toUpperCase();
+    final code = _promoController.text.trim().toUpperCase();
 
-    if (code == 'JITAK10' || code == 'WELCOME') {
+    if (code.isEmpty) {
+      _msg('يرجى إدخال كود الخصم أولاً.');
+    } else if (code == 'JITAK10' || code == 'WELCOME') {
       setState(() {
-        _discountAmount = 3.0; // خصم 3 دينار
+        _discountAmount = 3.0;
         _appliedPromoCode = code;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم تطبيق الكوبون ($code) بنجاح! تم خصم 3.0 د.ل'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else if (code.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى إدخال كود الخصم أولاً.')),
-      );
+      _msg('تم تطبيق الكوبون ($code)! تم خصم 3.0 د.ل', color: Colors.green);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('كود الخصم غير صحيح أو منتهي الصلاحية!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _msg('كود الخصم غير صحيح أو منتهي الصلاحية!', color: Colors.red);
     }
   }
 
   double get _finalFare {
-    double fare = _baseFare - _discountAmount;
+    final fare = _baseFare - _discountAmount;
     return fare > 0 ? fare : 0.0;
   }
 
-  // دالة لعرض إشعار الطلب الوارد للسائق (محاكاة)
-  void _simulateDriverIncomingRequest(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.notifications_active, color: Colors.teal),
-              SizedBox(width: 8),
-              Text('طلب رحلة جديد!'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('الوجهة: ${_destinationController.text}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('التكلفة النهائية: ${_finalFare.toStringAsFixed(1)} د.ل'),
-              if (_discountAmount > 0)
-                Text(
-                  'تم خصم ${_discountAmount.toStringAsFixed(1)} د.ل بكوبون ($_appliedPromoCode)',
-                  style: const TextStyle(color: Colors.green, fontSize: 12),
-                ),
-              const SizedBox(height: 8),
-              Text('طريقة الدفع: $_selectedPaymentMethod'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم رفض الطلب.')),
-                );
-              },
-              child: const Text('رفض', style: TextStyle(color: Colors.red)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TrackingScreen(tripFare: _finalFare),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              child: const Text('قبول الرحلة',
-                  style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
+  // إنشاء طلب رحلة حقيقي في قاعدة البيانات
+  Future<void> _requestRide() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final destination = _destinationController.text.trim();
+
+    if (user == null) return;
+    if (destination.isEmpty) {
+      _msg('الرجاء إدخال وجهتك أولاً!');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final ref = await FirebaseFirestore.instance.collection('rides').add({
+        'customerId': user.uid,
+        'customerName': user.displayName ?? '',
+        'destination': destination,
+        'fare': _finalFare,
+        'paymentMethod': _selectedPaymentMethod,
+        'status': 'requested',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => RideStatusScreen(rideId: ref.id)),
+      );
+    } catch (_) {
+      _msg('تعذر إرسال الطلب، حاول مجدداً.', color: Colors.red);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -155,7 +123,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // تسجيل الخروج الفعلي، وAuthGate يعيدك لشاشة الدخول
               await FirebaseAuth.instance.signOut();
             },
             tooltip: 'تسجيل الخروج',
@@ -221,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // حقل كود الخصم (الكوبون)
                       Row(
                         children: [
                           Expanded(
@@ -254,7 +220,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // عرض التكلفة بعد الخصم
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -284,6 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
+                      if (_appliedPromoCode.isNotEmpty)
+                        Text(
+                          'كوبون مطبّق: $_appliedPromoCode',
+                          style: const TextStyle(
+                              color: Colors.green, fontSize: 12),
+                        ),
                       const Divider(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -310,16 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () {
-                          if (_destinationController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('الرجاء إدخال وجهتك أولاً!')),
-                            );
-                            return;
-                          }
-                          _simulateDriverIncomingRequest(context);
-                        },
+                        onPressed: _loading ? null : _requestRide,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -327,11 +289,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               borderRadius: BorderRadius.circular(12)),
                           minimumSize: const Size(double.infinity, 50),
                         ),
-                        child: const Text('بحث عن كابتن الآن',
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                        child: _loading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('بحث عن كابتن الآن',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -344,3 +313,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+// نهاية الملف
