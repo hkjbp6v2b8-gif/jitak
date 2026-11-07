@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
 import 'ride_history_screen.dart';
 import 'settings_screen.dart';
 import 'ride_status_screen.dart';
+import 'location_map.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   double _discountAmount = 0.0;
   String _appliedPromoCode = '';
   bool _loading = false;
+  LatLng? _pickup; // موقع العميل الحالي
 
   @override
   void dispose() {
@@ -61,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _requestRide() async {
     final user = FirebaseAuth.instance.currentUser;
     final destination = _destinationController.text.trim();
+    final pickup = _pickup;
 
     if (user == null) return;
     if (destination.isEmpty) {
@@ -77,6 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
         'fare': _finalFare,
         'paymentMethod': _selectedPaymentMethod,
         'status': 'requested',
+        if (pickup != null)
+          'pickup': GeoPoint(pickup.latitude, pickup.longitude),
         'createdAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
@@ -135,25 +141,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.teal.shade200),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.location_on, size: 60, color: Colors.teal),
-                      SizedBox(height: 8),
-                      Text('أنت هنا (موقعك الحالي)',
-                          style: TextStyle(
-                              color: Colors.grey, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
+              LocationMap(
+                onLocated: (position) => _pickup = position,
               ),
               const SizedBox(height: 16),
               Card(
