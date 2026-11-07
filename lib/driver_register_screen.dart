@@ -10,34 +10,36 @@ class DriverRegisterScreen extends StatefulWidget {
 }
 
 class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _carModelController = TextEditingController();
-  final TextEditingController _plateNumberController = TextEditingController();
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _car = TextEditingController();
+  final _plate = TextEditingController();
+  bool _loading = false;
 
-  bool _isLoading = false;
-
-  // حالات إرفاق الصور (محاكاة الرفع حالياً)
-  bool _hasProfilePhoto = false;
-  bool _hasPassportPhoto = false;
-  bool _hasLicensePhoto = false;
-  bool _hasCarExteriorPhoto = false;
-  bool _hasCarInteriorPhoto = false;
+  // إرفاق الصور (محاكاة حالياً)
+  final Map<String, bool> _docs = {
+    'الصورة الشخصية': false,
+    'جواز السفر': false,
+    'رخصة القيادة': false,
+    'صورة السيارة (من الخارج)': false,
+    'صورة السيارة (من الداخل)': false,
+  };
 
   @override
   void dispose() {
-    _fullNameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _carModelController.dispose();
-    _plateNumberController.dispose();
+    for (final c in [_name, _phone, _email, _password, _car, _plate]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  String _errorMessage(String code) {
+  void _msg(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  String _error(String code) {
     switch (code) {
       case 'email-already-in-use':
         return 'هذا البريد مسجل مسبقاً.';
@@ -53,43 +55,29 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   }
 
   Future<void> _submit() async {
-    final name = _fullNameController.text.trim();
-    final phone = _phoneController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final carModel = _carModelController.text.trim();
-    final plate = _plateNumberController.text.trim();
+    final name = _name.text.trim();
+    final phone = _phone.text.trim();
+    final email = _email.text.trim();
+    final password = _password.text;
+    final car = _car.text.trim();
+    final plate = _plate.text.trim();
 
-    if (name.isEmpty ||
-        phone.isEmpty ||
-        email.isEmpty ||
-        password.isEmpty ||
-        carModel.isEmpty ||
-        plate.isEmpty ||
-        !_hasProfilePhoto ||
-        !_hasPassportPhoto ||
-        !_hasLicensePhoto ||
-        !_hasCarExteriorPhoto ||
-        !_hasCarInteriorPhoto) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('الرجاء تعبئة كافة البيانات وإرفاق جميع المستندات المطلوبة!')),
-      );
+    final allFilled =
+        [name, phone, email, password, car, plate].every((s) => s.isNotEmpty);
+    if (!allFilled || !_docs.values.every((v) => v)) {
+      _msg('الرجاء تعبئة كافة البيانات وإرفاق جميع المستندات!');
       return;
     }
     if (password.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('كلمة المرور 6 أحرف على الأقل.')),
-      );
+      _msg('كلمة المرور 6 أحرف على الأقل.');
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _loading = true);
     try {
-      final credential = await FirebaseAuth.instance
+      final cred = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
-      final user = credential.user;
+      final user = cred.user;
       await user?.updateDisplayName(name);
 
       if (user != null) {
@@ -104,63 +92,68 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
             'email': email,
             'role': 'driver',
             'status': 'pending',
-            'carModel': carModel,
+            'carModel': car,
             'plateNumber': plate,
             'createdAt': FieldValue.serverTimestamp(),
           });
         } catch (_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('تم إنشاء الحساب لكن تعذر حفظ البيانات.')),
-            );
-          }
+          if (mounted) _msg('تم إنشاء الحساب لكن تعذر حفظ البيانات.');
         }
       }
 
       if (!mounted) return;
-      // العودة للجذر، وتوجيهك لشاشة "قيد المراجعة" يتم تلقائياً
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_errorMessage(e.code))),
-      );
+      if (mounted) _msg(_error(e.code));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Widget _buildUploadTile({
-    required String title,
-    required String subtitle,
-    required bool isUploaded,
-    required VoidCallback onTap,
-  }) {
+  Widget _title(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+          fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+    );
+  }
+
+  Widget _field(TextEditingController c, String label, IconData icon,
+      {TextInputType? type, bool obscure = false}) {
+    return TextField(
+      controller: c,
+      keyboardType: type,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.teal),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _docTile(String title) {
+    final done = _docs[title] ?? false;
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor:
-              isUploaded ? Colors.green.shade100 : Colors.teal.shade50,
+          backgroundColor: done ? Colors.green.shade100 : Colors.teal.shade50,
           child: Icon(
-            isUploaded ? Icons.check_circle : Icons.cloud_upload,
-            color: isUploaded ? Colors.green : Colors.teal,
+            done ? Icons.check_circle : Icons.cloud_upload,
+            color: done ? Colors.green : Colors.teal,
           ),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
         trailing: ElevatedButton(
-          onPressed: onTap,
+          onPressed: () => setState(() => _docs[title] = !done),
           style: ElevatedButton.styleFrom(
-            backgroundColor: isUploaded ? Colors.grey.shade400 : Colors.teal,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            backgroundColor: done ? Colors.grey.shade400 : Colors.teal,
           ),
           child: Text(
-            isUploaded ? 'تم الرفع' : 'إرفاق',
+            done ? 'تم الرفع' : 'إرفاق',
             style: const TextStyle(color: Colors.white),
           ),
         ),
@@ -176,108 +169,68 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
         backgroundColor: Colors.teal,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'بيانات الحساب',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal),
-            ),
+            _title('بيانات الحساب'),
             const SizedBox(height: 12),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'البريد الإلكتروني',
-                prefixIcon: const Icon(Icons.email_outlined, color: Colors.teal),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            _field(_email, 'البريد الإلكتروني', Icons.email_outlined,
+                type: TextInputType.emailAddress),
             const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'كلمة المرور (6 أحرف على الأقل)',
-                prefixIcon: const Icon(Icons.lock_outline, color: Colors.teal),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            _field(_password, 'كلمة المرور (6 أحرف على الأقل)',
+                Icons.lock_outline,
+                obscure: true),
             const Divider(height: 32),
-            const Text(
-              'البيانات الشخصية والسيارة',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal),
-            ),
+            _title('البيانات الشخصية والسيارة'),
             const SizedBox(height: 12),
-            TextField(
-              controller: _fullNameController,
-              decoration: InputDecoration(
-                labelText: 'الاسم الثلاثي',
-                prefixIcon: const Icon(Icons.person, color: Colors.teal),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            _field(_name, 'الاسم الثلاثي', Icons.person),
             const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'رقم الهاتف',
-                prefixIcon: const Icon(Icons.phone, color: Colors.teal),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            _field(_phone, 'رقم الهاتف', Icons.phone,
+                type: TextInputType.phone),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _carModelController,
-                    decoration: InputDecoration(
-                      labelText: 'نوع وموديل السيارة',
-                      prefixIcon:
-                          const Icon(Icons.directions_car, color: Colors.teal),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _plateNumberController,
-                    decoration: InputDecoration(
-                      labelText: 'رقم اللوحة',
-                      prefixIcon: const Icon(Icons.pin, color: Colors.teal),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _field(_car, 'نوع وموديل السيارة', Icons.directions_car),
+            const SizedBox(height: 12),
+            _field(_plate, 'رقم اللوحة', Icons.pin),
             const Divider(height: 32),
-            const Text(
-              'إرفاق الوثائق الرسمية والمستندات',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal),
-            ),
+            _title('إرفاق الوثائق والمستندات'),
             const SizedBox(height: 6),
             const Text(
               'ملاحظة: رفع الصور تجريبي حالياً، وسيُفعَّل الرفع الفعلي قريباً.',
               style: TextStyle(color: Colors.orange, fontSize: 13),
             ),
             const SizedBox(height: 16),
+            ..._docs.keys.map(_docTile),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _loading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text(
+                      'إرسال الطلب للمراجعة',
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold),
+                    ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+// نهاية الملف
