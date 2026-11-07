@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'driver_profile_screen.dart';
 import 'driver_wallet_screen.dart';
 
@@ -11,12 +12,12 @@ class DriverScreen extends StatefulWidget {
 
 class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
-  double _currentDebt = 22.5; // الدين الحالي على السائق (د.ل)
-  final double _maxDebtLimit = 30.0; // حد التوقف (30 دينار)
+  double _currentDebt = 22.5; // بيانات تجريبية (د.ل)
+  final double _maxDebtLimit = 30.0;
 
   @override
   Widget build(BuildContext context) {
-    bool isBlocked = _currentDebt >= _maxDebtLimit;
+    final bool isBlocked = _currentDebt >= _maxDebtLimit;
 
     return Scaffold(
       appBar: AppBar(
@@ -47,8 +48,12 @@ class _DriverScreenState extends State<DriverScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed: () async {
+              // تسجيل الخروج الفعلي، ثم العودة للجذر
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
             tooltip: 'تسجيل الخروج',
           ),
@@ -59,7 +64,6 @@ class _DriverScreenState extends State<DriverScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // بطاقة إدارة الرصيد والديون
             Card(
               elevation: 4,
               color: isBlocked ? Colors.red.shade50 : Colors.teal.shade50,
@@ -149,7 +153,6 @@ class _DriverScreenState extends State<DriverScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // حالة الاتصال وقبول الرحلات
             SwitchListTile(
               title: const Text('أنت متصل الآن لاستقبال الرحلات',
                   style: TextStyle(fontWeight: FontWeight.bold)),
@@ -174,7 +177,6 @@ class _DriverScreenState extends State<DriverScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            // قائمة الطلبات (تتوقف إذا كان الحساب موقوفاً)
             Expanded(
               child: isBlocked || !_isOnline
                   ? Center(
@@ -231,3 +233,4 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 }
+// نهاية الملف
