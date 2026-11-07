@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'customer_register_screen.dart';
 import 'driver_register_screen.dart';
+import 'driver_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -11,26 +12,60 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
-    if (_phoneController.text.trim().isEmpty) {
+  String _errorMessage(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'صيغة البريد الإلكتروني غير صحيحة.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'البريد أو كلمة المرور غير صحيحة.';
+      case 'user-disabled':
+        return 'هذا الحساب موقوف.';
+      case 'too-many-requests':
+        return 'محاولات كثيرة. حاول لاحقاً.';
+      case 'network-request-failed':
+        return 'تحقق من اتصالك بالإنترنت.';
+      default:
+        return 'تعذر تسجيل الدخول ($code).';
+    }
+  }
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء إدخال رقم الهاتف أولاً!')),
+        const SnackBar(content: Text('الرجاء إدخال البريد وكلمة المرور.')),
       );
       return;
     }
-    // سيتم ربط التحقق الفعلي (Firebase) لاحقاً
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
+
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+      // الانتقال للشاشة الرئيسية يتم تلقائياً عبر AuthGate
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_errorMessage(e.code))),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -44,11 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 40),
-              const Icon(
-                Icons.local_taxi,
-                size: 80,
-                color: Colors.teal,
-              ),
+              const Icon(Icons.local_taxi, size: 80, color: Colors.teal),
               const SizedBox(height: 16),
               const Text(
                 'مرحباً بك في جِيتك',
@@ -61,17 +92,29 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'أدخل رقم هاتفك للمتابعة',
+                'سجّل دخولك للمتابعة',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 32),
               TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'رقم الهاتف',
-                  prefixIcon: const Icon(Icons.phone),
+                  labelText: 'البريد الإلكتروني',
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور',
+                  prefixIcon: const Icon(Icons.lock_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -79,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _login,
+                onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -87,10 +130,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'دخول',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'دخول',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
               ),
               const SizedBox(height: 24),
               const Divider(),
@@ -115,6 +165,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: const Text(
                   'هل تريد العمل كابتن؟ سجّل كسائق',
                   style: TextStyle(color: Colors.deepOrange),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const DriverScreen()),
+                  );
+                },
+                child: const Text(
+                  'معاينة لوحة السائق (تجريبي)',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
             ],
