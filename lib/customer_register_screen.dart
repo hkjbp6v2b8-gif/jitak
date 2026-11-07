@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CustomerRegisterScreen extends StatefulWidget {
   const CustomerRegisterScreen({Key? key}) : super(key: key);
@@ -41,13 +42,14 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty || phone.isEmpty || email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('الرجاء تعبئة الاسم والبريد وكلمة المرور!')),
+            content: Text('الرجاء تعبئة الاسم والهاتف والبريد وكلمة المرور!')),
       );
       return;
     }
@@ -62,8 +64,32 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
     try {
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
-      await credential.user?.updateDisplayName(name);
-      // ملاحظة: رقم الهاتف سيُحفظ في قاعدة البيانات في الخطوة التالية
+      final user = credential.user;
+      await user?.updateDisplayName(name);
+
+      // حفظ بيانات المستخدم في قاعدة البيانات
+      if (user != null) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'name': name,
+            'phone': phone,
+            'email': email,
+            'role': 'customer',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('تم إنشاء الحساب لكن تعذر حفظ البيانات.')),
+            );
+          }
+        }
+      }
+
       if (!mounted) return;
       // العودة للجذر، وAuthGate يعرض الشاشة الرئيسية تلقائياً
       Navigator.of(context).popUntil((route) => route.isFirst);
