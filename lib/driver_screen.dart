@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
 import 'driver_profile_screen.dart';
 import 'driver_wallet_screen.dart';
+import 'ride_details_screen.dart';
+import 'ride_map.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -13,8 +16,8 @@ class DriverScreen extends StatefulWidget {
 
 class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
-  double _currentDebt = 22.5; // بيانات تجريبية (د.ل)
-  final double _maxDebtLimit = 30.0;
+  double _debt = 22.5; // بيانات تجريبية (د.ل)
+  final double _maxDebt = 30.0;
 
   CollectionReference<Map<String, dynamic>> get _rides =>
       FirebaseFirestore.instance.collection('rides');
@@ -25,22 +28,8 @@ class _DriverScreenState extends State<DriverScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _accept(String rideId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final name = (user.displayName ?? '').isEmpty ? 'الكابتن' : user.displayName;
-    try {
-      await _rides.doc(rideId).update({
-        'status': 'accepted',
-        'driverId': user.uid,
-        'driverName': name,
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
-      if (mounted) _msg('تم قبول الرحلة!');
-    } catch (_) {
-      if (mounted) _msg('تعذر قبول الرحلة (ربما قبلها سائق آخر).');
-    }
-  }
+  LatLng? _point(dynamic v) =>
+      v is GeoPoint ? LatLng(v.latitude, v.longitude) : null;
 
   Future<void> _complete(String rideId) async {
     try {
@@ -54,9 +43,99 @@ class _DriverScreenState extends State<DriverScreen> {
     }
   }
 
-  // بطاقة الرحلة الجارية
-  Widget _activeRideCard(String rideId, Map<String, dynamic> ride) {
+  void _openDetails(String rideId, Map<String, dynamic> ride) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RideDetailsScreen(rideId: rideId, ride: ride),
+      ),
+    );
+  }
+
+  // بطاقة الديون والمحفظة (أرقام تجريبية حالياً)
+  Widget _debtCard(bool blocked) {
+    final color = blocked ? Colors.red : Colors.teal;
+    return Card(
+      elevation: 4,
+      color: blocked ? Colors.red.shade50 : Colors.teal.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+            color: blocked ? Colors.red : Colors.teal.shade200, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('محفظة العمولة والديون',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Icon(
+                  blocked
+                      ? Icons.warning_amber_rounded
+                      : Icons.account_balance_wallet,
+                  color: color,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'الديون المتراكمة: $_debt د.ل (الحد الأقصى: $_maxDebt د.ل)',
+              style: TextStyle(
+                color: blocked ? Colors.red.shade700 : Colors.black87,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: (_debt / _maxDebt).clamp(0.0, 1.0).toDouble(),
+              backgroundColor: Colors.grey.shade300,
+              color: color,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              blocked
+                  ? 'تجاوزت الحد الأقصى للديون. تم إيقاف استقبال الرحلات حتى التسديد.'
+                  : 'الحساب متاح لاستقبال الطلبات. (الأرقام تجريبية حالياً)',
+              style: TextStyle(
+                color: blocked ? Colors.red : Colors.grey,
+                fontSize: 12,
+                fontWeight: blocked ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _debt = 0.0;
+                  _isOnline = true;
+                });
+                _msg('تم تسديد الدين (تجريبي).');
+              },
+              icon: const Icon(Icons.payment, color: Colors.white, size: 18),
+              label: const Text('تسديد الدين وتعبئة الرصيد',
+                  style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                minimumSize: const Size(double.infinity, 36),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // الرحلة الجارية مع الخريطة
+  Widget _activeCard(String rideId, Map<String, dynamic> ride) {
+    final pickup = _point(ride['pickup']);
+    final dest = _point(ride['destinationPoint']);
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+
     return Card(
       elevation: 4,
       color: Colors.teal.shade50,
@@ -74,7 +153,16 @@ class _DriverScreenState extends State<DriverScreen> {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.teal)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            if (pickup != null && dest != null) ...[
+              RideMap(
+                key: ValueKey(rideId),
+                pickup: pickup,
+                destination: dest,
+                height: 220,
+              ),
+              const SizedBox(height: 10),
+            ],
             Text('العميل: ${(ride['customerName'] ?? '').toString()}'),
             Text('الوجهة: ${(ride['destination'] ?? '').toString()}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -133,22 +221,26 @@ class _DriverScreenState extends State<DriverScreen> {
           children: docs.map((doc) {
             final ride = doc.data();
             final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+            final km = (ride['distanceKm'] as num?)?.toDouble();
+            final kmText = km == null ? '' : '${km.toStringAsFixed(1)} كم • ';
             return Card(
               elevation: 2,
               child: ListTile(
+                onTap: () => _openDetails(doc.id, ride),
                 leading: const CircleAvatar(
                   backgroundColor: Colors.tealAccent,
                   child: Icon(Icons.person, color: Colors.teal),
                 ),
-                title: Text('رحلة إلى: ${(ride['destination'] ?? '').toString()}',
+                title: Text(
+                    'رحلة إلى: ${(ride['destination'] ?? '').toString()}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(
-                    'التكلفة: ${fare.toStringAsFixed(1)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+                    '$kmText${fare.toStringAsFixed(1)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
                 trailing: ElevatedButton(
-                  onPressed: () => _accept(doc.id),
+                  onPressed: () => _openDetails(doc.id, ride),
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: const Text('قبول',
+                  child: const Text('عرض',
                       style: TextStyle(color: Colors.white)),
                 ),
               ),
@@ -161,7 +253,7 @@ class _DriverScreenState extends State<DriverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isBlocked = _currentDebt >= _maxDebtLimit;
+    final blocked = _debt >= _maxDebt;
 
     return Scaffold(
       appBar: AppBar(
@@ -170,6 +262,7 @@ class _DriverScreenState extends State<DriverScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
+            tooltip: 'المحفظة والأرباح',
             onPressed: () {
               Navigator.push(
                 context,
@@ -177,10 +270,10 @@ class _DriverScreenState extends State<DriverScreen> {
                     builder: (context) => const DriverWalletScreen()),
               );
             },
-            tooltip: 'المحفظة والأرباح',
           ),
           IconButton(
             icon: const Icon(Icons.person),
+            tooltip: 'الملف الشخصي',
             onPressed: () {
               Navigator.push(
                 context,
@@ -188,127 +281,38 @@ class _DriverScreenState extends State<DriverScreen> {
                     builder: (context) => const DriverProfileScreen()),
               );
             },
-            tooltip: 'الملف الشخصي',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'تسجيل الخروج',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               }
             },
-            tooltip: 'تسجيل الخروج',
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              elevation: 4,
-              color: isBlocked ? Colors.red.shade50 : Colors.teal.shade50,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: isBlocked ? Colors.red : Colors.teal.shade200,
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'محفظة العمولة والديون',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Icon(
-                          isBlocked
-                              ? Icons.warning_amber_rounded
-                              : Icons.account_balance_wallet,
-                          color: isBlocked ? Colors.red : Colors.teal,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'الديون المتراكمة: $_currentDebt د.ل (الحد الأقصى: $_maxDebtLimit د.ل)',
-                      style: TextStyle(
-                        color: isBlocked ? Colors.red.shade700 : Colors.black87,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: (_currentDebt / _maxDebtLimit)
-                          .clamp(0.0, 1.0)
-                          .toDouble(),
-                      backgroundColor: Colors.grey.shade300,
-                      color: isBlocked ? Colors.red : Colors.teal,
-                    ),
-                    const SizedBox(height: 12),
-                    if (isBlocked)
-                      const Text(
-                        'تنبيه: تجاوزت الحد الأقصى للديون (30 د.ل). تم ايقاف استقبال الرحلات حتى تسديد الدين.',
-                        style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold),
-                      )
-                    else
-                      const Text(
-                        'الحساب متاح لاستقبال الطلبات بشكل طبيعي. (الأرقام تجريبية حالياً)',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // محاكاة تسديد الديون (سيُربط بالخادم لاحقاً)
-                        setState(() {
-                          _currentDebt = 0.0;
-                          _isOnline = true;
-                        });
-                        _msg('تم تسديد الدين (تجريبي).');
-                      },
-                      icon: const Icon(Icons.payment,
-                          color: Colors.white, size: 18),
-                      label: const Text('تسديد الدين وتعبئة الرصيد',
-                          style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isBlocked ? Colors.red : Colors.teal,
-                        minimumSize: const Size(double.infinity, 36),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _debtCard(blocked),
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('أنت متصل الآن لاستقبال الرحلات',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(isBlocked
+              subtitle: Text(blocked
                   ? 'متوقف تلقائياً بسبب الديون'
                   : (_isOnline
                       ? 'تستقبل طلبات الزبائن حالياً'
                       : 'أنت في وضع عدم الاتصال')),
-              value: isBlocked ? false : _isOnline,
+              value: blocked ? false : _isOnline,
               activeColor: Colors.teal,
-              onChanged: isBlocked
-                  ? null
-                  : (bool value) {
-                      setState(() {
-                        _isOnline = value;
-                      });
-                    },
+              onChanged:
+                  blocked ? null : (v) => setState(() => _isOnline = v),
             ),
             const Divider(height: 24),
             Expanded(
@@ -318,15 +322,15 @@ class _DriverScreenState extends State<DriverScreen> {
                     .where('driverId', isEqualTo: _uid)
                     .where('status', isEqualTo: 'accepted')
                     .snapshots(),
-                builder: (context, activeSnap) {
-                  if (activeSnap.hasData && activeSnap.data!.docs.isNotEmpty) {
-                    final doc = activeSnap.data!.docs.first;
+                builder: (context, active) {
+                  if (active.hasData && active.data!.docs.isNotEmpty) {
+                    final doc = active.data!.docs.first;
                     return SingleChildScrollView(
-                      child: _activeRideCard(doc.id, doc.data()),
+                      child: _activeCard(doc.id, doc.data()),
                     );
                   }
 
-                  if (isBlocked || !_isOnline) {
+                  if (blocked || !_isOnline) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -335,7 +339,7 @@ class _DriverScreenState extends State<DriverScreen> {
                               size: 60, color: Colors.grey.shade400),
                           const SizedBox(height: 10),
                           Text(
-                            isBlocked
+                            blocked
                                 ? 'الحساب موقوف مؤقتاً لتجاوز الدين'
                                 : 'أنت غير متصل حالياً',
                             style: const TextStyle(
@@ -350,11 +354,9 @@ class _DriverScreenState extends State<DriverScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
-                        'الطلبات القريبة المتاحة:',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                      const Text('الطلبات القريبة المتاحة:',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       Expanded(child: _requestsList()),
                     ],
