@@ -7,6 +7,7 @@ import 'driver_wallet_screen.dart';
 import 'ride_details_screen.dart';
 import 'ride_map.dart';
 import 'pricing.dart';
+import 'driver_location_sender.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -131,7 +132,7 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // الرحلة الجارية مع الخريطة
+  // الرحلة الجارية مع الخريطة ومشاركة الموقع
   Widget _activeCard(String rideId, Map<String, dynamic> ride) {
     final pickup = _point(ride['pickup']);
     final dest = _point(ride['destinationPoint']);
@@ -154,6 +155,8 @@ class _DriverScreenState extends State<DriverScreen> {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.teal)),
+            const SizedBox(height: 10),
+            DriverLocationSender(key: ValueKey('loc-$rideId'), rideId: rideId),
             const SizedBox(height: 10),
             if (pickup != null && dest != null) ...[
               RideMap(
