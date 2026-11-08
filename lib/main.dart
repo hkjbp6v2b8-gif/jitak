@@ -7,6 +7,8 @@ import 'login_screen.dart';
 import 'home_screen.dart';
 import 'driver_screen.dart';
 import 'driver_pending_screen.dart';
+import 'admin_config.dart';
+import 'admin_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +81,11 @@ class RoleGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // المدير يفتح لوحة الإدارة مباشرة
+    if (AdminConfig.isAdmin(user.email)) {
+      return const AdminScreen();
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -142,3 +149,4 @@ class _LoadingScreen extends StatelessWidget {
     );
   }
 }
+// نهاية الملف
