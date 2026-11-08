@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 import 'ride_map.dart';
+import 'pricing.dart';
 
 // تفاصيل الطلب للسائق قبل القبول
 class RideDetailsScreen extends StatefulWidget {
@@ -125,7 +126,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     _info(Icons.straighten,
                         'المسافة: ${km.toStringAsFixed(1)} كم'),
                   _info(Icons.payments,
-                      'التكلفة: ${fare.toStringAsFixed(1)} د.ل'),
+                      'التكلفة: ${Pricing.format(fare)} د.ل'),
                   _info(Icons.account_balance_wallet,
                       'الدفع: ${(ride['paymentMethod'] ?? '').toString()}'),
                 ],
