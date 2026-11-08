@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'pricing.dart';
 
 class RatingScreen extends StatefulWidget {
   final double tripFare;
+  final String? rideId;
 
-  const RatingScreen({Key? key, required this.tripFare}) : super(key: key);
+  const RatingScreen({Key? key, required this.tripFare, this.rideId})
+      : super(key: key);
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -11,12 +15,39 @@ class RatingScreen extends StatefulWidget {
 
 class _RatingScreenState extends State<RatingScreen> {
   int _rating = 5;
-  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _note = TextEditingController();
+  bool _saving = false;
 
   @override
   void dispose() {
-    _notesController.dispose();
+    _note.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final id = widget.rideId;
+    setState(() => _saving = true);
+    try {
+      if (id != null) {
+        final note = _note.text.trim();
+        await FirebaseFirestore.instance.collection('rides').doc(id).update({
+          'rating': _rating,
+          if (note.isNotEmpty) 'ratingNote': note,
+          'ratedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('شكراً لتقييمك! تم إغلاق الرحلة.')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر حفظ التقييم، حاول مجدداً.')),
+      );
+      setState(() => _saving = false);
+    }
   }
 
   @override
@@ -25,10 +56,10 @@ class _RatingScreenState extends State<RatingScreen> {
       appBar: AppBar(
         title: const Text('تقييم الرحلة'),
         backgroundColor: Colors.teal,
-        automaticallyImplyLeading: false, // لمنع العودة للخلف قبل التقييم
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -48,13 +79,13 @@ class _RatingScreenState extends State<RatingScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'نتمنى أن تكون قد استمتعت برحلتك مع الكابتن محمد علي.',
+              'نتمنى أن تكون قد استمتعت برحلتك.',
               style: TextStyle(color: Colors.grey, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
             Text(
-              'إجمالي التكلفة: ${widget.tripFare.toStringAsFixed(1)} د.ل',
+              'إجمالي التكلفة: ${Pricing.format(widget.tripFare)} د.ل',
               style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -63,58 +94,52 @@ class _RatingScreenState extends State<RatingScreen> {
             ),
             const SizedBox(height: 30),
             const Text(
-              'كيف كانت تجربة قيادة الكابتن؟',
+              'كيف كانت تجربة الرحلة؟',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            // صف نجوم التقييم
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
+              children: List.generate(5, (i) {
                 return IconButton(
                   icon: Icon(
-                    index < _rating ? Icons.star : Icons.star_border,
+                    i < _rating ? Icons.star : Icons.star_border,
                     color: Colors.amber,
                     size: 36,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _rating = index + 1;
-                    });
-                  },
+                  onPressed: () => setState(() => _rating = i + 1),
                 );
               }),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
             TextField(
-              controller: _notesController,
+              controller: _note,
+              maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'اكتب ملاحظاتك (اختياري)...',
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              maxLines: 2,
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 28),
             ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content:
-                          Text('شكراً لتقييمك! تم إغلاق الرحلة بنجاح.')),
-                );
-                // العودة لشاشة العميل الرئيسية
-                Navigator.pop(context);
-              },
+              onPressed: _saving ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('إرسال التقييم والعودة للرئيسية',
-                  style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: _saving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('إرسال التقييم والعودة للرئيسية',
+                      style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],
         ),
@@ -122,3 +147,4 @@ class _RatingScreenState extends State<RatingScreen> {
     );
   }
 }
+// نهاية الملف
