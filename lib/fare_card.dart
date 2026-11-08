@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'pricing.dart';
 
 // بطاقة المسافة والسعر وزر الطلب
 class FareCard extends StatelessWidget {
@@ -128,14 +129,14 @@ class FareCard extends StatelessWidget {
                 children: [
                   if (discount > 0 && before != null)
                     Text(
-                      '${before.toStringAsFixed(1)} د.ل',
+                      '${Pricing.format(before)} د.ل',
                       style: const TextStyle(
                           fontSize: 14,
                           decoration: TextDecoration.lineThrough,
                           color: Colors.grey),
                     ),
                   Text(
-                    fare == null ? '—' : '${fare.toStringAsFixed(1)} د.ل',
+                    fare == null ? '—' : '${Pricing.format(fare)} د.ل',
                     style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
