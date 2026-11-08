@@ -1,59 +1,50 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
+
+class RouteResult {
+  final double distanceKm;
+  final List<LatLng> points;
+
+  const RouteResult(this.distanceKm, this.points);
+}
 
 class RoutingService {
-  // مفتاح الـ API الخاص بـ Google Maps (قم بوضع مفتاحك هنا أو استخدم مفتاح الويب الخاص بك)
-  static const String _apiKey = "AIzaSyCq14cu4ax2Tww5GnSy3SuvA5aj0nsirmc";
-
-  // دالة لجلب المسار (Polyline) بين نقطة الانطلاق ونقطة الوصول
-  static Future<List<LatLng>> getRouteCoordinates(LatLng origin, LatLng destination) async {
-    final String url = 
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$_apiKey&language=ar';
+  // يطلب المسار من خدمة OSRM العامة (مناسبة للتجربة فقط)
+  static Future<RouteResult?> getRoute(LatLng from, LatLng to) async {
+    final url = Uri.parse(
+      'https://router.project-osrm.org/route/v1/driving/'
+      '${from.longitude},${from.latitude};${to.longitude},${to.latitude}'
+      '?overview=full&geometries=geojson',
+    );
 
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['routes'].isNotEmpty) {
-          final points = data['routes'][0]['overview_polyline']['points'];
-          return _decodePolyline(points);
-        }
-      }
-    } catch (e) {
-      print('خطأ في جلب بيانات المسار: $e');
+      final response =
+          await http.get(url).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['code'] != 'Ok') return null;
+
+      final routes = data['routes'] as List;
+      if (routes.isEmpty) return null;
+
+      final route = routes.first as Map<String, dynamic>;
+      final meters = (route['distance'] as num).toDouble();
+      final coords = route['geometry']['coordinates'] as List;
+
+      final points = coords.map<LatLng>((c) {
+        final pair = c as List;
+        return LatLng(
+          (pair[1] as num).toDouble(),
+          (pair[0] as num).toDouble(),
+        );
+      }).toList();
+
+      return RouteResult(meters / 1000, points);
+    } catch (_) {
+      return null;
     }
-    return [];
-  }
-
-  // دالة فك تشفير إحداثيات المسار (Polyline Decoder)
-  static List<LatLng> _decodePolyline(String encoded) {
-    List<LatLng> points = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.add(LatLng(lat / 1E5, lng / 1E5));
-    }
-    return points;
   }
 }
+// نهاية الملف
