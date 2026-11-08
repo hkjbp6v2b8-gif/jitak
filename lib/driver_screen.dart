@@ -6,6 +6,7 @@ import 'driver_profile_screen.dart';
 import 'driver_wallet_screen.dart';
 import 'ride_details_screen.dart';
 import 'ride_map.dart';
+import 'pricing.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -166,7 +167,7 @@ class _DriverScreenState extends State<DriverScreen> {
             Text('العميل: ${(ride['customerName'] ?? '').toString()}'),
             Text('الوجهة: ${(ride['destination'] ?? '').toString()}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('التكلفة: ${fare.toStringAsFixed(1)} د.ل'),
+            Text('التكلفة: ${Pricing.format(fare)} د.ل'),
             Text('الدفع: ${(ride['paymentMethod'] ?? '').toString()}'),
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -235,7 +236,7 @@ class _DriverScreenState extends State<DriverScreen> {
                     'رحلة إلى: ${(ride['destination'] ?? '').toString()}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(
-                    '$kmText${fare.toStringAsFixed(1)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+                    '$kmText${Pricing.format(fare)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
                 trailing: ElevatedButton(
                   onPressed: () => _openDetails(doc.id, ride),
                   style:
