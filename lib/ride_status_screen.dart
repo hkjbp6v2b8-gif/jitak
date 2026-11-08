@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'rating_screen.dart';
+import 'pricing.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -51,24 +52,34 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             children: [
               icon,
               const SizedBox(height: 20),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+              Text(title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
-              ),
+              Text(subtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14)),
               const SizedBox(height: 28),
               ...actions,
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _back(String label) {
+    return ElevatedButton(
+      onPressed: () => Navigator.of(context).pop(),
+      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+      child: Text(label, style: const TextStyle(color: Colors.white)),
+    );
+  }
+
+  Widget _loadingScreen() {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator(color: Colors.teal)),
     );
   }
 
@@ -82,19 +93,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             icon: const Icon(Icons.error_outline, size: 80, color: Colors.red),
             title: 'تعذر تحميل الرحلة',
             subtitle: 'تحقق من الاتصال وحاول مجدداً.',
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('العودة'),
-              ),
-            ],
+            actions: [_back('العودة')],
           );
         }
-        if (!snap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: Colors.teal)),
-          );
-        }
+        if (!snap.hasData) return _loadingScreen();
 
         final data = snap.data!.data();
         if (data == null) {
@@ -102,12 +104,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             icon: const Icon(Icons.help_outline, size: 80, color: Colors.grey),
             title: 'الرحلة غير موجودة',
             subtitle: '',
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('العودة'),
-              ),
-            ],
+            actions: [_back('العودة')],
           );
         }
 
@@ -116,7 +113,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         final fare = (data['fare'] as num?)?.toDouble() ?? 0.0;
         final driverName = (data['driverName'] ?? 'الكابتن').toString();
         final details =
-            'الوجهة: $destination\nالتكلفة: ${fare.toStringAsFixed(1)} د.ل';
+            'الوجهة: $destination\nالتكلفة: ${Pricing.format(fare)} د.ل';
 
         if (status == 'completed') {
           if (!_navigated) {
@@ -126,13 +123,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => RatingScreen(tripFare: fare)),
+                  builder: (context) =>
+                      RatingScreen(tripFare: fare, rideId: widget.rideId),
+                ),
               );
             });
           }
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: Colors.teal)),
-          );
+          return _loadingScreen();
         }
 
         if (status == 'cancelled') {
@@ -140,15 +137,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             icon: const Icon(Icons.cancel_outlined, size: 90, color: Colors.red),
             title: 'تم إلغاء الرحلة',
             subtitle: details,
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style:
-                    ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                child: const Text('العودة للرئيسية',
-                    style: TextStyle(color: Colors.white)),
-              ),
-            ],
+            actions: [_back('العودة للرئيسية')],
           );
         }
 
