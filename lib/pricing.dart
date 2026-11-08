@@ -3,9 +3,10 @@ class Pricing {
   static const double perKm = 1.90; // سعر الكيلومتر (د.ل)
   static const int minimumFare = 1; // أقل سعر للرحلة (د.ل)
 
-  // السعر عدد صحيح: تقريب لأقرب دينار، وبحد أدنى
+  // السعر عدد صحيح دائماً: تقريب للأعلى
   static double fareForKm(double km) {
-    final fare = (perKm * km).round();
+    // الطرح الصغير يمنع خطأ الكسور العشرية (مثل 4.0000001 ← 5)
+    final fare = (perKm * km - 0.000001).ceil();
     return (fare < minimumFare ? minimumFare : fare).toDouble();
   }
 
