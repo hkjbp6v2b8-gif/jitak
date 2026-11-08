@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
 import 'rating_screen.dart';
 import 'pricing.dart';
+import 'live_ride_map.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -18,6 +20,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   DocumentReference<Map<String, dynamic>> get _ref =>
       FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
 
+  LatLng? _point(dynamic v) =>
+      v is GeoPoint ? LatLng(v.latitude, v.longitude) : null;
+
   Future<void> _cancel() async {
     try {
       await _ref.update({
@@ -30,6 +35,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         const SnackBar(content: Text('تعذر إلغاء الرحلة، حاول مجدداً.')),
       );
     }
+  }
+
+  Widget _cancelButton(String label) {
+    return OutlinedButton(
+      onPressed: _cancel,
+      child: Text(label, style: const TextStyle(color: Colors.red)),
+    );
   }
 
   Widget _screen({
@@ -80,6 +92,69 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   Widget _loadingScreen() {
     return const Scaffold(
       body: Center(child: CircularProgressIndicator(color: Colors.teal)),
+    );
+  }
+
+  // بعد قبول الرحلة: خريطة مباشرة فيها سيارة الكابتن
+  Widget _acceptedView(
+      Map<String, dynamic> data, String driverName, String details) {
+    final pickup = _point(data['pickup']);
+    final dest = _point(data['destinationPoint']);
+    final driver = _point(data['driverLocation']);
+
+    // طلب قديم بلا إحداثيات
+    if (pickup == null || dest == null) {
+      return _screen(
+        icon: const Icon(Icons.directions_car, size: 90, color: Colors.teal),
+        title: 'قَبِلَ $driverName رحلتك',
+        subtitle: 'الكابتن في طريقه إليك.\n$details',
+        actions: [_cancelButton('إلغاء الرحلة')],
+      );
+    }
+
+    final String distanceText;
+    if (driver == null) {
+      distanceText = 'جارٍ انتظار موقع الكابتن...';
+    } else {
+      final km = const Distance().as(LengthUnit.Kilometer, driver, pickup);
+      distanceText = 'الكابتن يبعد عنك نحو ${km.toStringAsFixed(1)} كم';
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('حالة الرحلة'),
+        backgroundColor: Colors.teal,
+        automaticallyImplyLeading: false,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          LiveRideMap(
+            pickup: pickup,
+            destination: dest,
+            driver: driver,
+            height: 320,
+          ),
+          const SizedBox(height: 16),
+          Text('قَبِلَ $driverName رحلتك',
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(distanceText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.teal,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(details,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          const SizedBox(height: 20),
+          Center(child: _cancelButton('إلغاء الرحلة')),
+        ],
+      ),
     );
   }
 
@@ -142,18 +217,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         }
 
         if (status == 'accepted') {
-          return _screen(
-            icon: const Icon(Icons.directions_car, size: 90, color: Colors.teal),
-            title: 'قَبِلَ $driverName رحلتك',
-            subtitle: 'الكابتن في طريقه إليك.\n$details',
-            actions: [
-              OutlinedButton(
-                onPressed: _cancel,
-                child: const Text('إلغاء الرحلة',
-                    style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          );
+          return _acceptedView(data, driverName, details);
         }
 
         // requested
@@ -165,13 +229,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
           ),
           title: 'جارٍ البحث عن كابتن...',
           subtitle: details,
-          actions: [
-            OutlinedButton(
-              onPressed: _cancel,
-              child: const Text('إلغاء الطلب',
-                  style: TextStyle(color: Colors.red)),
-            ),
-          ],
+          actions: [_cancelButton('إلغاء الطلب')],
         );
       },
     );
