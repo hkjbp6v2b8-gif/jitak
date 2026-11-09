@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'contact_buttons.dart';
 
-// يرسل موقع السائق للعميل أثناء الرحلة الجارية
+// عند السائق في الرحلة الجارية: يرسل موقعه للعميل، ويعرض أزرار التواصل
 class DriverLocationSender extends StatefulWidget {
   final String rideId;
 
@@ -80,8 +81,7 @@ class _DriverLocationSenderState extends State<DriverLocationSender> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _statusBar() {
     final String text;
     final Color color;
     final IconData icon;
@@ -115,6 +115,23 @@ class _DriverLocationSenderState extends State<DriverLocationSender> {
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _statusBar(),
+        const SizedBox(height: 10),
+        ContactButtons(
+          rideId: widget.rideId,
+          me: 'driver',
+          other: 'customer',
+          otherLabel: 'العميل',
+        ),
+      ],
     );
   }
 }
