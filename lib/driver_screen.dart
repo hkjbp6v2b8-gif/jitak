@@ -8,6 +8,7 @@ import 'ride_details_screen.dart';
 import 'ride_map.dart';
 import 'pricing.dart';
 import 'driver_location_sender.dart';
+import 'wallet_builder.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -18,8 +19,6 @@ class DriverScreen extends StatefulWidget {
 
 class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
-  double _debt = 22.5; // بيانات تجريبية (د.ل)
-  final double _maxDebt = 30.0;
 
   CollectionReference<Map<String, dynamic>> get _rides =>
       FirebaseFirestore.instance.collection('rides');
@@ -54,9 +53,22 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // بطاقة الديون والمحفظة (أرقام تجريبية حالياً)
-  Widget _debtCard(bool blocked) {
+  // بطاقة المحفظة: المستحق للشركة من رحلاتك الفعلية
+  Widget _walletCard(WalletData w, bool blocked) {
     final color = blocked ? Colors.red : Colors.teal;
+    final limit = WalletConfig.debtLimit;
+    final rate = (WalletConfig.commissionRate * 100).round();
+
+    final String info;
+    if (w.loading) {
+      info = 'جارٍ تحميل المحفظة...';
+    } else if (w.error) {
+      info = 'تعذر تحميل المحفظة. تحقق من الاتصال.';
+    } else {
+      info =
+          'المستحق للشركة (عمولة $rate%): ${w.debt.toStringAsFixed(1)} د.ل (الحد الأقصى: ${limit.toStringAsFixed(0)} د.ل)';
+    }
+
     return Card(
       elevation: 4,
       color: blocked ? Colors.red.shade50 : Colors.teal.shade50,
@@ -73,7 +85,7 @@ class _DriverScreenState extends State<DriverScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('محفظة العمولة والديون',
+                const Text('محفظة العمولة',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 Icon(
@@ -85,44 +97,41 @@ class _DriverScreenState extends State<DriverScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              'الديون المتراكمة: $_debt د.ل (الحد الأقصى: $_maxDebt د.ل)',
-              style: TextStyle(
-                color: blocked ? Colors.red.shade700 : Colors.black87,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(info,
+                style: TextStyle(
+                  color: blocked ? Colors.red.shade700 : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                )),
             const SizedBox(height: 6),
             LinearProgressIndicator(
-              value: (_debt / _maxDebt).clamp(0.0, 1.0).toDouble(),
+              value: w.ready ? (w.debt / limit).clamp(0.0, 1.0).toDouble() : 0,
               backgroundColor: Colors.grey.shade300,
               color: color,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               blocked
-                  ? 'تجاوزت الحد الأقصى للديون. تم إيقاف استقبال الرحلات حتى التسديد.'
-                  : 'الحساب متاح لاستقبال الطلبات. (الأرقام تجريبية حالياً)',
+                  ? 'بلغ المستحق الحد الأقصى. سدّد للإدارة ليُعاد تفعيل استقبال الطلبات.'
+                  : 'الحساب متاح لاستقبال الطلبات. للتسديد تواصل مع الإدارة.',
               style: TextStyle(
                 color: blocked ? Colors.red : Colors.grey,
                 fontSize: 12,
                 fontWeight: blocked ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
               onPressed: () {
-                setState(() {
-                  _debt = 0.0;
-                  _isOnline = true;
-                });
-                _msg('تم تسديد الدين (تجريبي).');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const DriverWalletScreen()),
+                );
               },
-              icon: const Icon(Icons.payment, color: Colors.white, size: 18),
-              label: const Text('تسديد الدين وتعبئة الرصيد',
-                  style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
+              icon: Icon(Icons.account_balance_wallet, color: color, size: 18),
+              label: Text('المحفظة والأرباح', style: TextStyle(color: color)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: color),
                 minimumSize: const Size(double.infinity, 36),
               ),
             ),
@@ -132,7 +141,7 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // الرحلة الجارية مع الخريطة ومشاركة الموقع
+  // الرحلة الجارية مع الخريطة ومشاركة الموقع وأزرار التواصل
   Widget _activeCard(String rideId, Map<String, dynamic> ride) {
     final pickup = _point(ride['pickup']);
     final dest = _point(ride['destinationPoint']);
@@ -257,8 +266,16 @@ class _DriverScreenState extends State<DriverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final blocked = _debt >= _maxDebt;
+    return WalletBuilder(
+      driverId: _uid,
+      builder: (context, wallet) {
+        final blocked = wallet.ready && wallet.debt >= WalletConfig.debtLimit;
+        return _page(wallet, blocked);
+      },
+    );
+  }
 
+  Widget _page(WalletData wallet, bool blocked) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('لوحة السائق'),
@@ -303,13 +320,13 @@ class _DriverScreenState extends State<DriverScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _debtCard(blocked),
+            _walletCard(wallet, blocked),
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('أنت متصل الآن لاستقبال الرحلات',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(blocked
-                  ? 'متوقف تلقائياً بسبب الديون'
+                  ? 'متوقف تلقائياً بسبب المستحقات'
                   : (_isOnline
                       ? 'تستقبل طلبات الزبائن حالياً'
                       : 'أنت في وضع عدم الاتصال')),
@@ -344,7 +361,7 @@ class _DriverScreenState extends State<DriverScreen> {
                           const SizedBox(height: 10),
                           Text(
                             blocked
-                                ? 'الحساب موقوف مؤقتاً لتجاوز الدين'
+                                ? 'الحساب موقوف مؤقتاً لبلوغ حد المستحقات'
                                 : 'أنت غير متصل حالياً',
                             style: const TextStyle(
                                 color: Colors.grey,
