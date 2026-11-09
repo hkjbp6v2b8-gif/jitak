@@ -5,10 +5,13 @@ import 'package:latlong2/latlong.dart';
 import 'driver_profile_screen.dart';
 import 'driver_wallet_screen.dart';
 import 'ride_details_screen.dart';
-import 'ride_map.dart';
 import 'pricing.dart';
 import 'driver_location_sender.dart';
 import 'wallet_builder.dart';
+import 'driver_map.dart';
+
+typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
+typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -20,12 +23,27 @@ class DriverScreen extends StatefulWidget {
 class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
 
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _activeStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _requestsStream;
+
   CollectionReference<Map<String, dynamic>> get _rides =>
       FirebaseFirestore.instance.collection('rides');
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
+  @override
+  void initState() {
+    super.initState();
+    _activeStream = _rides
+        .where('driverId', isEqualTo: _uid)
+        .where('status', isEqualTo: 'accepted')
+        .snapshots();
+    _requestsStream =
+        _rides.where('status', isEqualTo: 'requested').snapshots();
+  }
+
   void _msg(String text) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
@@ -38,9 +56,9 @@ class _DriverScreenState extends State<DriverScreen> {
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
       });
-      if (mounted) _msg('تم إنهاء الرحلة.');
+      _msg('تم إنهاء الرحلة.');
     } catch (_) {
-      if (mounted) _msg('تعذر إنهاء الرحلة، حاول مجدداً.');
+      _msg('تعذر إنهاء الرحلة، حاول مجدداً.');
     }
   }
 
@@ -66,41 +84,27 @@ class _DriverScreenState extends State<DriverScreen> {
       info = 'تعذر تحميل المحفظة. تحقق من الاتصال.';
     } else {
       info =
-          'المستحق للشركة (عمولة $rate%): ${w.debt.toStringAsFixed(1)} د.ل (الحد الأقصى: ${limit.toStringAsFixed(0)} د.ل)';
+          'المستحق للشركة (عمولة $rate%): ${w.debt.toStringAsFixed(1)} د.ل من ${limit.toStringAsFixed(0)} د.ل';
     }
 
     return Card(
-      elevation: 4,
+      elevation: 2,
       color: blocked ? Colors.red.shade50 : Colors.teal.shade50,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-            color: blocked ? Colors.red : Colors.teal.shade200, width: 1.5),
+            color: blocked ? Colors.red : Colors.teal.shade200, width: 1.2),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('محفظة العمولة',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Icon(
-                  blocked
-                      ? Icons.warning_amber_rounded
-                      : Icons.account_balance_wallet,
-                  color: color,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
             Text(info,
                 style: TextStyle(
                   color: blocked ? Colors.red.shade700 : Colors.black87,
                   fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 )),
             const SizedBox(height: 6),
             LinearProgressIndicator(
@@ -108,18 +112,18 @@ class _DriverScreenState extends State<DriverScreen> {
               backgroundColor: Colors.grey.shade300,
               color: color,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               blocked
-                  ? 'بلغ المستحق الحد الأقصى. سدّد للإدارة ليُعاد تفعيل استقبال الطلبات.'
-                  : 'الحساب متاح لاستقبال الطلبات. للتسديد تواصل مع الإدارة.',
+                  ? 'بلغ المستحق الحد الأقصى. سدّد للإدارة ليُعاد تفعيل الاستقبال.'
+                  : 'للتسديد تواصل مع الإدارة.',
               style: TextStyle(
                 color: blocked ? Colors.red : Colors.grey,
                 fontSize: 12,
                 fontWeight: blocked ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -132,7 +136,7 @@ class _DriverScreenState extends State<DriverScreen> {
               label: Text('المحفظة والأرباح', style: TextStyle(color: color)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: color),
-                minimumSize: const Size(double.infinity, 36),
+                minimumSize: const Size(double.infinity, 34),
               ),
             ),
           ],
@@ -141,21 +145,19 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // الرحلة الجارية مع الخريطة ومشاركة الموقع وأزرار التواصل
+  // الرحلة الجارية: مشاركة الموقع + أزرار التواصل + الإنهاء
   Widget _activeCard(String rideId, Map<String, dynamic> ride) {
-    final pickup = _point(ride['pickup']);
-    final dest = _point(ride['destinationPoint']);
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
 
     return Card(
-      elevation: 4,
+      elevation: 3,
       color: Colors.teal.shade50,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: Colors.teal.shade300, width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -167,15 +169,6 @@ class _DriverScreenState extends State<DriverScreen> {
             const SizedBox(height: 10),
             DriverLocationSender(key: ValueKey('loc-$rideId'), rideId: rideId),
             const SizedBox(height: 10),
-            if (pickup != null && dest != null) ...[
-              RideMap(
-                key: ValueKey(rideId),
-                pickup: pickup,
-                destination: dest,
-                height: 220,
-              ),
-              const SizedBox(height: 10),
-            ],
             Text('العميل: ${(ride['customerName'] ?? '').toString()}'),
             Text('الوجهة: ${(ride['destination'] ?? '').toString()}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -198,70 +191,106 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // قائمة الطلبات المفتوحة
-  Widget _requestsList() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _rides.where('status', isEqualTo: 'requested').snapshots(),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return const Center(
+  Widget _requestTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final ride = doc.data();
+    final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+    final km = (ride['distanceKm'] as num?)?.toDouble();
+    final kmText = km == null ? '' : '${km.toStringAsFixed(1)} كم • ';
+
+    return Card(
+      elevation: 2,
+      child: ListTile(
+        onTap: () => _openDetails(doc.id, ride),
+        leading: const CircleAvatar(
+          backgroundColor: Colors.tealAccent,
+          child: Icon(Icons.person, color: Colors.teal),
+        ),
+        title: Text('رحلة إلى: ${(ride['destination'] ?? '').toString()}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+            '$kmText${Pricing.format(fare)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+        trailing: ElevatedButton(
+          onPressed: () => _openDetails(doc.id, ride),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+          child: const Text('عرض', style: TextStyle(color: Colors.white)),
+        ),
+      ),
+    );
+  }
+
+  // محتوى اللوحة السفلية: الرحلة الجارية، أو الطلبات المفتوحة
+  List<Widget> _ridesSection(
+    _Docs activeDocs,
+    _Docs openDocs,
+    _Snap open,
+    bool blocked,
+  ) {
+    if (activeDocs.isNotEmpty) {
+      final doc = activeDocs.first;
+      return [_activeCard(doc.id, doc.data())];
+    }
+
+    if (blocked || !_isOnline) {
+      return [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(Icons.block, size: 50, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                blocked
+                    ? 'الحساب موقوف مؤقتاً لبلوغ حد المستحقات'
+                    : 'أنت غير متصل حالياً',
+                style: const TextStyle(
+                    color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+
+    if (open.hasError) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(
             child: Text('تعذر تحميل الطلبات. تحقق من الاتصال.',
                 style: TextStyle(color: Colors.grey)),
-          );
-        }
-        if (!snap.hasData) {
-          return const Center(
-              child: CircularProgressIndicator(color: Colors.teal));
-        }
+          ),
+        ),
+      ];
+    }
+    if (!open.hasData) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator(color: Colors.teal)),
+        ),
+      ];
+    }
+    if (openDocs.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(
+            child: Text(
+              'لا توجد طلبات حالياً. سيظهر أي طلب جديد هنا وعلى الخريطة فوراً.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ),
+      ];
+    }
 
-        final docs = snap.data!.docs.toList();
-        docs.sort((a, b) {
-          final ta = a.data()['createdAt'] as Timestamp?;
-          final tb = b.data()['createdAt'] as Timestamp?;
-          if (ta == null || tb == null) return 0;
-          return tb.compareTo(ta);
-        });
-
-        if (docs.isEmpty) {
-          return const Center(
-            child: Text('لا توجد طلبات حالياً. سيظهر أي طلب جديد هنا فوراً.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
-          );
-        }
-
-        return ListView(
-          children: docs.map((doc) {
-            final ride = doc.data();
-            final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
-            final km = (ride['distanceKm'] as num?)?.toDouble();
-            final kmText = km == null ? '' : '${km.toStringAsFixed(1)} كم • ';
-            return Card(
-              elevation: 2,
-              child: ListTile(
-                onTap: () => _openDetails(doc.id, ride),
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.tealAccent,
-                  child: Icon(Icons.person, color: Colors.teal),
-                ),
-                title: Text(
-                    'رحلة إلى: ${(ride['destination'] ?? '').toString()}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(
-                    '$kmText${Pricing.format(fare)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
-                trailing: ElevatedButton(
-                  onPressed: () => _openDetails(doc.id, ride),
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: const Text('عرض',
-                      style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
+    return [
+      const Text('الطلبات القريبة المتاحة:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      ...openDocs.map(_requestTile),
+    ];
   }
 
   @override
@@ -270,12 +299,63 @@ class _DriverScreenState extends State<DriverScreen> {
       driverId: _uid,
       builder: (context, wallet) {
         final blocked = wallet.ready && wallet.debt >= WalletConfig.debtLimit;
-        return _page(wallet, blocked);
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _activeStream,
+          builder: (context, active) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _requestsStream,
+              builder: (context, open) =>
+                  _page(wallet, blocked, active, open),
+            );
+          },
+        );
       },
     );
   }
 
-  Widget _page(WalletData wallet, bool blocked) {
+  Widget _page(WalletData wallet, bool blocked, _Snap active, _Snap open) {
+    final _Docs activeDocs = active.data?.docs ?? [];
+    final bool hasActive = activeDocs.isNotEmpty;
+
+    final _Docs openDocs = (open.data?.docs ?? []).toList();
+    openDocs.sort((a, b) {
+      final ta = a.data()['createdAt'] as Timestamp?;
+      final tb = b.data()['createdAt'] as Timestamp?;
+      if (ta == null || tb == null) return 0;
+      return tb.compareTo(ta);
+    });
+
+    final bool showRequests = !hasActive && _isOnline && !blocked;
+
+    // دبابيس الطلبات على الخريطة
+    final markers = <MapRequest>[];
+    if (showRequests) {
+      for (final doc in openDocs) {
+        final point = _point(doc.data()['pickup']);
+        if (point == null) continue;
+        final fare = (doc.data()['fare'] as num?)?.toDouble() ?? 0.0;
+        markers.add(MapRequest(doc.id, point, '${Pricing.format(fare)} د.ل'));
+      }
+    }
+
+    final activeRide = hasActive ? activeDocs.first.data() : null;
+
+    final String statusText;
+    final Color statusColor;
+    if (hasActive) {
+      statusText = 'رحلة جارية';
+      statusColor = Colors.teal;
+    } else if (blocked) {
+      statusText = 'موقوف: بلغ حد المستحقات';
+      statusColor = Colors.red;
+    } else if (_isOnline) {
+      statusText = 'متصل • بانتظار الطلبات';
+      statusColor = Colors.green.shade700;
+    } else {
+      statusText = 'غير متصل';
+      statusColor = Colors.grey.shade700;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('لوحة السائق'),
@@ -315,78 +395,76 @@ class _DriverScreenState extends State<DriverScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _walletCard(wallet, blocked),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('أنت متصل الآن لاستقبال الرحلات',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(blocked
-                  ? 'متوقف تلقائياً بسبب المستحقات'
-                  : (_isOnline
-                      ? 'تستقبل طلبات الزبائن حالياً'
-                      : 'أنت في وضع عدم الاتصال')),
-              value: blocked ? false : _isOnline,
-              activeColor: Colors.teal,
-              onChanged:
-                  blocked ? null : (v) => setState(() => _isOnline = v),
-            ),
-            const Divider(height: 24),
-            Expanded(
-              // الرحلة الجارية لها الأولوية، وإلا تظهر الطلبات المفتوحة
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _rides
-                    .where('driverId', isEqualTo: _uid)
-                    .where('status', isEqualTo: 'accepted')
-                    .snapshots(),
-                builder: (context, active) {
-                  if (active.hasData && active.data!.docs.isNotEmpty) {
-                    final doc = active.data!.docs.first;
-                    return SingleChildScrollView(
-                      child: _activeCard(doc.id, doc.data()),
-                    );
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DriverMap(
+              statusText: statusText,
+              statusColor: statusColor,
+              requests: markers,
+              onRequestTap: (id) {
+                for (final doc in openDocs) {
+                  if (doc.id == id) {
+                    _openDetails(doc.id, doc.data());
+                    return;
                   }
-
-                  if (blocked || !_isOnline) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.block,
-                              size: 60, color: Colors.grey.shade400),
-                          const SizedBox(height: 10),
-                          Text(
-                            blocked
-                                ? 'الحساب موقوف مؤقتاً لبلوغ حد المستحقات'
-                                : 'أنت غير متصل حالياً',
-                            style: const TextStyle(
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                }
+              },
+              pickup: _point(activeRide?['pickup']),
+              destination: _point(activeRide?['destinationPoint']),
+            ),
+          ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.4,
+            minChildSize: 0.14,
+            maxChildSize: 0.92,
+            builder: (context, controller) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(blurRadius: 12, color: Colors.black26)
+                  ],
+                ),
+                child: ListView(
+                  controller: controller,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    );
-                  }
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text('الطلبات القريبة المتاحة:',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      Expanded(child: _requestsList()),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('أنا متصل لاستقبال الرحلات',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(blocked
+                          ? 'متوقف تلقائياً بسبب المستحقات'
+                          : (_isOnline
+                              ? 'تظهر لك الطلبات على الخريطة'
+                              : 'لن تصلك طلبات')),
+                      value: blocked ? false : _isOnline,
+                      activeColor: Colors.teal,
+                      onChanged:
+                          blocked ? null : (v) => setState(() => _isOnline = v),
+                    ),
+                    _walletCard(wallet, blocked),
+                    const SizedBox(height: 12),
+                    ..._ridesSection(activeDocs, openDocs, open, blocked),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
