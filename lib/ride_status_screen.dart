@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'rating_screen.dart';
 import 'pricing.dart';
 import 'live_ride_map.dart';
+import 'contact_buttons.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -41,6 +42,15 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     return OutlinedButton(
       onPressed: _cancel,
       child: Text(label, style: const TextStyle(color: Colors.red)),
+    );
+  }
+
+  Widget _contactButtons() {
+    return ContactButtons(
+      rideId: widget.rideId,
+      me: 'customer',
+      other: 'driver',
+      otherLabel: 'الكابتن',
     );
   }
 
@@ -95,7 +105,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
-  // بعد قبول الرحلة: خريطة مباشرة فيها سيارة الكابتن
+  // بعد قبول الرحلة: خريطة مباشرة فيها سيارة الكابتن + أزرار التواصل
   Widget _acceptedView(
       Map<String, dynamic> data, String driverName, String details) {
     final pickup = _point(data['pickup']);
@@ -108,7 +118,11 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         icon: const Icon(Icons.directions_car, size: 90, color: Colors.teal),
         title: 'قَبِلَ $driverName رحلتك',
         subtitle: 'الكابتن في طريقه إليك.\n$details',
-        actions: [_cancelButton('إلغاء الرحلة')],
+        actions: [
+          _contactButtons(),
+          const SizedBox(height: 12),
+          _cancelButton('إلغاء الرحلة'),
+        ],
       );
     }
 
@@ -151,7 +165,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
           Text(details,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          _contactButtons(),
+          const SizedBox(height: 12),
           Center(child: _cancelButton('إلغاء الرحلة')),
         ],
       ),
