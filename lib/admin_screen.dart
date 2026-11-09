@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'wallet_builder.dart';
 
-// لوحة الإدارة: مراجعة السائقين وتفعيلهم
+// لوحة الإدارة: مراجعة السائقين وتفعيلهم وتسجيل دفعاتهم
 class AdminScreen extends StatelessWidget {
   const AdminScreen({Key? key}) : super(key: key);
+
+  void _snack(BuildContext context, String text) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   Future<void> _setStatus(
     BuildContext context,
@@ -14,16 +20,78 @@ class AdminScreen extends StatelessWidget {
   ) async {
     try {
       await ref.update({'status': status});
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(okText)));
-      }
+      _snack(context, okText);
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر تنفيذ العملية، حاول مجدداً.')),
-        );
-      }
+      _snack(context, 'تعذر تنفيذ العملية، حاول مجدداً.');
+    }
+  }
+
+  // تسجيل دفعة من السائق للشركة (تنقص مستحقاته)
+  Future<void> _recordPayment(
+    BuildContext context,
+    String driverId,
+    String name,
+    double debt,
+  ) async {
+    final amountController =
+        TextEditingController(text: debt > 0 ? debt.toStringAsFixed(1) : '');
+    final noteController = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('تسجيل دفعة من $name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration:
+                  const InputDecoration(labelText: 'المبلغ المدفوع (د.ل)'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: noteController,
+              decoration:
+                  const InputDecoration(labelText: 'ملاحظة (اختياري)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            child: const Text('تسجيل', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    final amount =
+        double.tryParse(amountController.text.trim().replaceAll(',', '.'));
+    if (amount == null || amount <= 0) {
+      _snack(context, 'أدخل مبلغاً صحيحاً.');
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('driverPayments').add({
+        'driverId': driverId,
+        'amount': amount,
+        'note': noteController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _snack(context, 'تم تسجيل الدفعة.');
+    } catch (_) {
+      _snack(context, 'تعذر تسجيل الدفعة، حاول مجدداً.');
     }
   }
 
@@ -47,50 +115,112 @@ class AdminScreen extends StatelessWidget {
     );
   }
 
+  // أزرار السائق المفعّل: المستحق + تسجيل دفعة + إيقاف
+  Widget _approvedActions(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    WalletData w,
+  ) {
+    final name = (doc.data()['name'] ?? '').toString();
+    final blocked = w.ready && w.debt >= WalletConfig.debtLimit;
+
+    final String summary;
+    if (w.loading) {
+      summary = 'جارٍ حساب المستحقات...';
+    } else if (w.error) {
+      summary = 'تعذر حساب المستحقات.';
+    } else {
+      summary =
+          'المستحق للشركة: ${w.debt.toStringAsFixed(1)} د.ل  •  المدفوع: ${w.paidTotal.toStringAsFixed(1)} د.ل  •  الرحلات: ${w.tripsTotal}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          summary,
+          style: TextStyle(
+            color: blocked ? Colors.red : Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        if (blocked)
+          const Text(
+            'بلغ الحد الأقصى، فطلباته موقوفة في واجهته حتى يسدّد.',
+            style: TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: w.ready
+                    ? () => _recordPayment(context, doc.id, name, w.debt)
+                    : null,
+                icon: const Icon(Icons.payments, color: Colors.white, size: 18),
+                label: const Text('تسجيل دفعة',
+                    style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _setStatus(
+                    context, doc.reference, 'rejected', 'تم إيقاف السائق.'),
+                child: const Text('إيقاف السائق',
+                    style: TextStyle(color: Colors.red)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _card(
       BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data();
     final status = (d['status'] ?? 'pending').toString();
     final ref = doc.reference;
 
-    final buttons = <Widget>[];
+    final Widget actions;
     if (status == 'pending') {
-      buttons.add(Expanded(
-        child: ElevatedButton(
-          onPressed: () =>
-              _setStatus(context, ref, 'approved', 'تم تفعيل السائق.'),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          child: const Text('قبول وتفعيل',
-              style: TextStyle(color: Colors.white)),
-        ),
-      ));
-      buttons.add(const SizedBox(width: 10));
-      buttons.add(Expanded(
-        child: OutlinedButton(
-          onPressed: () =>
-              _setStatus(context, ref, 'rejected', 'تم رفض الطلب.'),
-          child: const Text('رفض', style: TextStyle(color: Colors.red)),
-        ),
-      ));
+      actions = Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () =>
+                  _setStatus(context, ref, 'approved', 'تم تفعيل السائق.'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('قبول وتفعيل',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () =>
+                  _setStatus(context, ref, 'rejected', 'تم رفض الطلب.'),
+              child: const Text('رفض', style: TextStyle(color: Colors.red)),
+            ),
+          ),
+        ],
+      );
     } else if (status == 'approved') {
-      buttons.add(Expanded(
-        child: OutlinedButton(
-          onPressed: () =>
-              _setStatus(context, ref, 'rejected', 'تم إيقاف السائق.'),
-          child: const Text('إيقاف السائق',
-              style: TextStyle(color: Colors.red)),
-        ),
-      ));
+      actions = WalletBuilder(
+        driverId: doc.id,
+        builder: (context, w) => _approvedActions(context, doc, w),
+      );
     } else {
-      buttons.add(Expanded(
-        child: ElevatedButton(
-          onPressed: () =>
-              _setStatus(context, ref, 'approved', 'تمت إعادة التفعيل.'),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-          child: const Text('إعادة التفعيل',
-              style: TextStyle(color: Colors.white)),
-        ),
-      ));
+      actions = ElevatedButton(
+        onPressed: () =>
+            _setStatus(context, ref, 'approved', 'تمت إعادة التفعيل.'),
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+        child: const Text('إعادة التفعيل',
+            style: TextStyle(color: Colors.white)),
+      );
     }
 
     return Card(
@@ -112,7 +242,7 @@ class AdminScreen extends StatelessWidget {
             if (_date(d['createdAt']).isNotEmpty)
               _line(Icons.event, 'تاريخ التسجيل: ${_date(d['createdAt'])}'),
             const SizedBox(height: 10),
-            Row(children: buttons),
+            actions,
           ],
         ),
       ),
