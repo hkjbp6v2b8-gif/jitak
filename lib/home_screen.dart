@@ -9,6 +9,8 @@ import 'location_map.dart';
 import 'pricing.dart';
 import 'routing_service.dart';
 import 'fare_card.dart';
+import 'geocoding_service.dart';
+import 'place_search_box.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -27,12 +29,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = false;
 
   LatLng? _pickup; // موقع العميل الحالي
-  LatLng? _destination; // الوجهة المختارة من الخريطة
+  LatLng? _destination; // الوجهة المختارة
   List<LatLng> _route = [];
   double? _km;
   bool _estimated = false; // المسافة تقديرية (تعذر جلب المسار)
   bool _routing = false;
   int _token = 0;
+
+  // اسم المكان الذي وضعه البحث تلقائياً في خانة وصف الوجهة
+  String _autoNoteText = '';
 
   @override
   void dispose() {
@@ -74,8 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return value > 0 ? value : 0.0;
   }
 
-  // عند الضغط على الخريطة لاختيار الوجهة
-  Future<void> _onMapTap(LatLng point) async {
+  // ضبط الوجهة وحساب المسار والمسافة
+  Future<void> _setDestination(LatLng point) async {
     final pickup = _pickup;
     if (pickup == null) {
       _msg('انتظر حتى يتم تحديد موقعك الحالي أولاً.');
@@ -115,6 +120,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // الضغط على الخريطة
+  Future<void> _onMapTap(LatLng point) async {
+    // إن كان الوصف من البحث السابق فنمسحه لأن الوجهة تغيّرت
+    if (_autoNoteText.isNotEmpty && _note.text == _autoNoteText) {
+      _note.clear();
+    }
+    _autoNoteText = '';
+    await _setDestination(point);
+  }
+
+  // اختيار نتيجة من البحث
+  Future<void> _onPlaceSelected(PlaceResult place) async {
+    _autoNoteText = place.name;
+    _note.text = place.name;
+    await _setDestination(place.point);
+  }
+
   // إنشاء طلب رحلة حقيقي في قاعدة البيانات
   Future<void> _requestRide() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -129,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (destination == null || km == null || fare == null) {
-      _msg('اضغط على الخريطة لاختيار وجهتك أولاً!');
+      _msg('اختر وجهتك بالبحث أو بالضغط على الخريطة أولاً!');
       return;
     }
 
@@ -203,13 +225,18 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            PlaceSearchBox(
+              near: _pickup,
+              onSelected: _onPlaceSelected,
+            ),
+            const SizedBox(height: 10),
             const Text(
-              'اضغط على الخريطة لاختيار وجهتك',
+              'أو اضغط على الخريطة لاختيار وجهتك',
               textAlign: TextAlign.center,
               style: TextStyle(
                   color: Colors.teal,
                   fontWeight: FontWeight.bold,
-                  fontSize: 15),
+                  fontSize: 14),
             ),
             const SizedBox(height: 8),
             LocationMap(
