@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'chat_screen.dart';
 
-// زرا "رقم الطرف الآخر" و"الدردشة"، ويحفظان رقم صاحب الشاشة للطرف الآخر
+// عند العميل: بطاقة الكابتن + زرا الرقم والدردشة
+// عند السائق: زرا الرقم والدردشة فقط
+// ويحفظ كل طرف بياناته للطرف الآخر داخل الرحلة
 class ContactButtons extends StatefulWidget {
   final String rideId;
   final String me; // 'customer' أو 'driver'
@@ -38,21 +40,50 @@ class _ContactButtonsState extends State<ContactButtons> {
     _saveMine();
   }
 
-  // يحفظ رقمي في الرحلة ليراه الطرف الآخر
+  // يحفظ بياناتي في الرحلة ليراها الطرف الآخر
   Future<void> _saveMine() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      final phone = (snap.data()?['phone'] ?? '').toString();
+      final db = FirebaseFirestore.instance;
+      final snap = await db.collection('users').doc(user.uid).get();
+      final data = snap.data() ?? {};
+      final phone = (data['phone'] ?? '').toString();
       if (phone.isEmpty) return;
-      await _contact(widget.me).set({
+
+      final info = <String, dynamic>{
         'phone': phone,
         'name': user.displayName ?? '',
-      });
+      };
+
+      if (widget.me == 'driver') {
+        info['car'] = (data['carModel'] ?? '').toString();
+        info['plate'] = (data['plateNumber'] ?? '').toString();
+        info['ratingCount'] = 0;
+        try {
+          // متوسط تقييمي من رحلاتي المكتملة
+          final rides = await db
+              .collection('rides')
+              .where('driverId', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'completed')
+              .get();
+          var sum = 0.0;
+          var count = 0;
+          for (final d in rides.docs) {
+            final r = d.data()['rating'];
+            if (r is num) {
+              sum += r;
+              count++;
+            }
+          }
+          info['ratingCount'] = count;
+          if (count > 0) info['rating'] = sum / count;
+        } catch (_) {
+          // نكمل بدون التقييم
+        }
+      }
+
+      await _contact(widget.me).set(info);
     } catch (_) {
       // غير حرج: يمكن إعادة المحاولة عند فتح الشاشة مجدداً
     }
@@ -132,7 +163,7 @@ class _ContactButtonsState extends State<ContactButtons> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final buttons = Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
@@ -159,6 +190,135 @@ class _ContactButtonsState extends State<ContactButtons> {
           ),
         ),
       ],
+    );
+
+    if (widget.me != 'customer') return buttons;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DriverInfoCard(rideId: widget.rideId),
+        buttons,
+      ],
+    );
+  }
+}
+
+// بطاقة تعريف الكابتن للعميل: الاسم والسيارة واللوحة والتقييم
+class _DriverInfoCard extends StatefulWidget {
+  final String rideId;
+
+  const _DriverInfoCard({Key? key, required this.rideId}) : super(key: key);
+
+  @override
+  State<_DriverInfoCard> createState() => _DriverInfoCardState();
+}
+
+class _DriverInfoCardState extends State<_DriverInfoCard> {
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = FirebaseFirestore.instance
+        .collection('rides')
+        .doc(widget.rideId)
+        .collection('contacts')
+        .doc('driver')
+        .snapshots();
+  }
+
+  Widget _stars(double avg) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final IconData icon;
+        if (avg >= i + 1) {
+          icon = Icons.star;
+        } else if (avg >= i + 0.5) {
+          icon = Icons.star_half;
+        } else {
+          icon = Icons.star_border;
+        }
+        return Icon(icon, color: Colors.amber, size: 18);
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _stream,
+      builder: (context, snap) {
+        final d = snap.data?.data();
+        if (d == null) return const SizedBox.shrink();
+
+        final name = (d['name'] ?? '').toString();
+        final car = (d['car'] ?? '').toString();
+        final plate = (d['plate'] ?? '').toString();
+        final count = (d['ratingCount'] as num?)?.toInt() ?? 0;
+        final rating = (d['rating'] as num?)?.toDouble();
+
+        return Card(
+          elevation: 3,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: Colors.teal.shade100,
+                  child: const Icon(Icons.person, color: Colors.teal, size: 30),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name.isEmpty ? 'الكابتن' : name,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      if (car.isNotEmpty)
+                        Text('السيارة: $car',
+                            style: const TextStyle(fontSize: 13)),
+                      if (plate.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black54),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('لوحة: $plate',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                      const SizedBox(height: 6),
+                      if (rating == null)
+                        const Text('كابتن جديد (لا تقييمات بعد)',
+                            style: TextStyle(color: Colors.grey, fontSize: 12))
+                      else
+                        Row(
+                          children: [
+                            _stars(rating),
+                            const SizedBox(width: 6),
+                            Text('${rating.toStringAsFixed(1)} ($count)',
+                                style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
