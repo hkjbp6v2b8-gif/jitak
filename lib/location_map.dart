@@ -39,9 +39,37 @@ class _LocationMapState extends State<LocationMap> {
   }
 
   @override
+  void didUpdateWidget(LocationMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final dest = widget.destination;
+    if (dest != null && dest != oldWidget.destination) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitTo(dest));
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  // يضبط الكاميرا لتشمل موقعي والوجهة
+  void _fitTo(LatLng dest) {
+    if (!mounted) return;
+    final me = _me;
+    try {
+      if (me == null) {
+        _controller.move(dest, 15);
+      } else {
+        _controller.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints([me, dest]),
+            padding: const EdgeInsets.all(50),
+            maxZoom: 16,
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _locate() async {
@@ -183,8 +211,8 @@ class _LocationMapState extends State<LocationMap> {
                 left: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade100,
                     borderRadius: BorderRadius.circular(10),
