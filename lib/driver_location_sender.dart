@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'contact_buttons.dart';
+import 'driver_nav_buttons.dart';
 
-// عند السائق في الرحلة الجارية: يرسل موقعه للعميل، ويعرض أزرار التواصل
+// عند السائق في الرحلة الجارية: يرسل موقعه للعميل، ويعرض أزرار الملاحة والتواصل
 class DriverLocationSender extends StatefulWidget {
   final String rideId;
 
@@ -124,6 +125,8 @@ class _DriverLocationSenderState extends State<DriverLocationSender> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _statusBar(),
+        const SizedBox(height: 10),
+        DriverNavButtons(rideId: widget.rideId),
         const SizedBox(height: 10),
         ContactButtons(
           rideId: widget.rideId,
