@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'wallet_builder.dart';
+import 'payment_dialog.dart';
+
+String _date(dynamic ts) {
+  if (ts is! Timestamp) return '';
+  final d = ts.toDate();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${d.year}/${two(d.month)}/${two(d.day)}';
+}
 
 class DriverWalletScreen extends StatelessWidget {
   const DriverWalletScreen({Key? key}) : super(key: key);
-
-  String _date(dynamic ts) {
-    if (ts is! Timestamp) return '';
-    final d = ts.toDate();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${d.year}/${two(d.month)}/${two(d.day)}';
-  }
 
   Widget _stat(String label, String value) {
     return Column(
@@ -129,18 +130,34 @@ class DriverWalletScreen extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         blocked
-                            ? 'بلغ المستحق الحد الأقصى (${limit.toStringAsFixed(0)} د.ل). سدّد للإدارة ليُعاد تفعيل استقبال الطلبات.'
-                            : 'الحد الأقصى للدين ${limit.toStringAsFixed(0)} د.ل. للتسديد تواصل مع الإدارة.',
+                            ? 'بلغ المستحق الحد الأقصى (${limit.toStringAsFixed(0)} د.ل). سدّد ليُعاد تفعيل استقبال الطلبات.'
+                            : 'الحد الأقصى للدين ${limit.toStringAsFixed(0)} د.ل.',
                         style: TextStyle(
                             color: blocked ? Colors.red : Colors.grey,
                             fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: w.debt > 0
+                            ? () => showPayDialog(context, debt: w.debt)
+                            : null,
+                        icon: const Icon(Icons.sim_card,
+                            color: Colors.white, size: 18),
+                        label: const Text('سداد المستحقات بكرت شحن',
+                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          minimumSize: const Size(double.infinity, 44),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              _RequestsList(uid: uid),
               const SizedBox(height: 20),
-              const Text('سجل الدفعات',
+              const Text('سجل الدفعات المعتمدة',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               if (w.payments.isEmpty)
@@ -152,6 +169,7 @@ class DriverWalletScreen extends StatelessWidget {
               else
                 ...w.payments.map((p) {
                   final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                  final note = (p['note'] ?? '').toString();
                   return Card(
                     elevation: 1,
                     child: ListTile(
@@ -159,8 +177,8 @@ class DriverWalletScreen extends StatelessWidget {
                         backgroundColor: Colors.tealAccent,
                         child: Icon(Icons.payments, color: Colors.teal),
                       ),
-                      title: const Text('دفعة للشركة',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(note.isEmpty ? 'دفعة للشركة' : note,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(_date(p['createdAt'])),
                       trailing: Text('- ${amount.toStringAsFixed(1)} د.ل',
                           style: const TextStyle(
@@ -173,6 +191,88 @@ class DriverWalletScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// طلبات السداد بالكروت التي أرسلها السائق وحالتها
+class _RequestsList extends StatefulWidget {
+  final String uid;
+
+  const _RequestsList({Key? key, required this.uid}) : super(key: key);
+
+  @override
+  State<_RequestsList> createState() => _RequestsListState();
+}
+
+class _RequestsListState extends State<_RequestsList> {
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
+      FirebaseFirestore.instance
+          .collection('paymentRequests')
+          .where('driverId', isEqualTo: widget.uid)
+          .snapshots();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _stream,
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final docs = snap.data!.docs.map((d) => d.data()).toList();
+        docs.sort((a, b) {
+          final ta = a['createdAt'];
+          final tb = b['createdAt'];
+          if (ta is! Timestamp || tb is! Timestamp) return 0;
+          return tb.compareTo(ta);
+        });
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('طلبات السداد بالكروت',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ...docs.map((r) {
+              final status = (r['status'] ?? 'pending').toString();
+              final amount = (r['amount'] as num?)?.toDouble();
+
+              final String statusText;
+              final Color statusColor;
+              if (status == 'approved') {
+                statusText = 'تم الخصم';
+                statusColor = Colors.green;
+              } else if (status == 'rejected') {
+                statusText = 'مرفوض';
+                statusColor = Colors.red;
+              } else {
+                statusText = 'قيد المراجعة';
+                statusColor = Colors.orange;
+              }
+
+              return Card(
+                elevation: 1,
+                child: ListTile(
+                  leading: Icon(Icons.sim_card, color: statusColor),
+                  title: Text(
+                      'كرت ${providerLabel((r['provider'] ?? '').toString())} ${maskCard((r['cardNumber'] ?? '').toString())}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${_date(r['createdAt'])}  •  $statusText',
+                      style: TextStyle(color: statusColor, fontSize: 12)),
+                  trailing: status == 'approved' && amount != null
+                      ? Text('- ${amount.toStringAsFixed(1)} د.ل',
+                          style: const TextStyle(
+                              color: Colors.teal,
+                              fontWeight: FontWeight.bold))
+                      : null,
+                ),
+              );
+            }),
+          ],
+        );
+      },
     );
   }
 }
