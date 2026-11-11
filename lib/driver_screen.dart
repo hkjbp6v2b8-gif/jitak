@@ -9,6 +9,7 @@ import 'pricing.dart';
 import 'driver_location_sender.dart';
 import 'wallet_builder.dart';
 import 'driver_map.dart';
+import 'driver_rating_screen.dart';
 
 typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
@@ -50,16 +51,31 @@ class _DriverScreenState extends State<DriverScreen> {
   LatLng? _point(dynamic v) =>
       v is GeoPoint ? LatLng(v.latitude, v.longitude) : null;
 
-  Future<void> _complete(String rideId) async {
+  // إنهاء الرحلة ثم فتح شاشة تقييم العميل
+  Future<void> _complete(String rideId, Map<String, dynamic> ride) async {
     try {
       await _rides.doc(rideId).update({
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
       });
-      _msg('تم إنهاء الرحلة.');
     } catch (_) {
       _msg('تعذر إنهاء الرحلة، حاول مجدداً.');
+      return;
     }
+    if (!mounted) return;
+
+    final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DriverRatingScreen(
+          rideId: rideId,
+          customerName: (ride['customerName'] ?? '').toString(),
+          fare: fare,
+          paymentMethod: (ride['paymentMethod'] ?? '').toString(),
+        ),
+      ),
+    );
   }
 
   void _openDetails(String rideId, Map<String, dynamic> ride) {
@@ -115,8 +131,8 @@ class _DriverScreenState extends State<DriverScreen> {
             const SizedBox(height: 6),
             Text(
               blocked
-                  ? 'بلغ المستحق الحد الأقصى. سدّد للإدارة ليُعاد تفعيل الاستقبال.'
-                  : 'للتسديد تواصل مع الإدارة.',
+                  ? 'بلغ المستحق الحد الأقصى. سدّد ليُعاد تفعيل الاستقبال.'
+                  : 'للسداد افتح المحفظة واختر "سداد بكرت شحن".',
               style: TextStyle(
                 color: blocked ? Colors.red : Colors.grey,
                 fontSize: 12,
@@ -145,7 +161,7 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // الرحلة الجارية: مشاركة الموقع + أزرار التواصل + الإنهاء
+  // الرحلة الجارية: مشاركة الموقع + أزرار الملاحة والتواصل + الإنهاء
   Widget _activeCard(String rideId, Map<String, dynamic> ride) {
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
 
@@ -176,7 +192,7 @@ class _DriverScreenState extends State<DriverScreen> {
             Text('الدفع: ${(ride['paymentMethod'] ?? '').toString()}'),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () => _complete(rideId),
+              onPressed: () => _complete(rideId, ride),
               icon: const Icon(Icons.flag, color: Colors.white),
               label: const Text('إنهاء الرحلة',
                   style: TextStyle(color: Colors.white)),
