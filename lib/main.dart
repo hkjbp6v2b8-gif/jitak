@@ -8,7 +8,7 @@ import 'home_screen.dart';
 import 'driver_screen.dart';
 import 'driver_pending_screen.dart';
 import 'admin_config.dart';
-import 'admin_screen.dart';
+import 'admin_home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,9 +81,9 @@ class RoleGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // المدير يفتح لوحة الإدارة مباشرة
+    // المدير يفتح واجهة الإدارة مباشرة
     if (AdminConfig.isAdmin(user.email)) {
-      return const AdminScreen();
+      return const AdminHome();
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
