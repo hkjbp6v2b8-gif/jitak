@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// أزرار فتح المسار في خرائط جوجل: إلى العميل، وإلى الوجهة
+// زر فتح المسار في خرائط جوجل: إلى العميل قبل البدء، وإلى الوجهة بعده
 class DriverNavButtons extends StatefulWidget {
   final String rideId;
 
@@ -44,47 +44,40 @@ class _DriverNavButtonsState extends State<DriverNavButtons> {
     );
   }
 
-  Widget _button(String label, IconData icon, GeoPoint? point) {
-    return Expanded(
-      child: OutlinedButton.icon(
-        onPressed: point == null ? null : () => _open(point),
-        icon: Icon(icon, color: Colors.blue.shade700, size: 18),
-        label: Text(label, style: TextStyle(color: Colors.blue.shade700)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.blue.shade700),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _stream,
       builder: (context, snap) {
         final d = snap.data?.data();
-        final pickup = d?['pickup'];
-        final dest = d?['destinationPoint'];
-        final GeoPoint? pickupPoint = pickup is GeoPoint ? pickup : null;
-        final GeoPoint? destPoint = dest is GeoPoint ? dest : null;
+        if (d == null) return const SizedBox.shrink();
 
-        if (pickupPoint == null && destPoint == null) {
-          return const SizedBox.shrink();
-        }
+        final started = d.containsKey('startedAt');
+        final raw = started ? d['destinationPoint'] : d['pickup'];
+        final GeoPoint? point = raw is GeoPoint ? raw : null;
+        if (point == null) return const SizedBox.shrink();
+
+        final label = started ? 'إلى الوجهة' : 'إلى العميل';
+        final icon = started ? Icons.flag : Icons.person_pin_circle;
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('فتح الملاحة في خرائط جوجل:',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(
+              started
+                  ? 'افتح الملاحة إلى الوجهة في خرائط جوجل:'
+                  : 'افتح الملاحة إلى العميل في خرائط جوجل:',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                _button('إلى العميل', Icons.person_pin_circle, pickupPoint),
-                const SizedBox(width: 10),
-                _button('إلى الوجهة', Icons.flag, destPoint),
-              ],
+            OutlinedButton.icon(
+              onPressed: () => _open(point),
+              icon: Icon(icon, color: Colors.blue.shade700, size: 18),
+              label: Text(label, style: TextStyle(color: Colors.blue.shade700)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.blue.shade700),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ],
         );
