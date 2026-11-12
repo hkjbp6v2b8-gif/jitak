@@ -10,6 +10,7 @@ import 'driver_location_sender.dart';
 import 'wallet_builder.dart';
 import 'driver_map.dart';
 import 'driver_rating_screen.dart';
+import 'driver_trip_controls.dart';
 
 typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
@@ -161,9 +162,10 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // الرحلة الجارية: مشاركة الموقع + أزرار الملاحة والتواصل + الإنهاء
+  // الرحلة الجارية: مشاركة الموقع + الملاحة والتواصل + مراحل الرحلة
   Widget _activeCard(String rideId, Map<String, dynamic> ride) {
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
+    final started = ride.containsKey('startedAt');
 
     return Card(
       elevation: 3,
@@ -185,22 +187,27 @@ class _DriverScreenState extends State<DriverScreen> {
             const SizedBox(height: 10),
             DriverLocationSender(key: ValueKey('loc-$rideId'), rideId: rideId),
             const SizedBox(height: 10),
+            DriverTripControls(
+                key: ValueKey('trip-$rideId'), rideId: rideId, ride: ride),
+            const SizedBox(height: 10),
             Text('العميل: ${(ride['customerName'] ?? '').toString()}'),
             Text('الوجهة: ${(ride['destination'] ?? '').toString()}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             Text('التكلفة: ${Pricing.format(fare)} د.ل'),
             Text('الدفع: ${(ride['paymentMethod'] ?? '').toString()}'),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _complete(rideId, ride),
-              icon: const Icon(Icons.flag, color: Colors.white),
-              label: const Text('إنهاء الرحلة',
-                  style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                minimumSize: const Size(double.infinity, 44),
+            if (started) ...[
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () => _complete(rideId, ride),
+                icon: const Icon(Icons.flag, color: Colors.white),
+                label: const Text('إنهاء الرحلة',
+                    style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  minimumSize: const Size(double.infinity, 44),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
