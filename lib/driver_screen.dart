@@ -11,6 +11,9 @@ import 'wallet_builder.dart';
 import 'driver_map.dart';
 import 'driver_rating_screen.dart';
 import 'driver_trip_controls.dart';
+import 'driver_history_screen.dart';
+import 'notifications_screen.dart';
+import 'contact_us_screen.dart';
 
 typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
@@ -84,6 +87,84 @@ class _DriverScreenState extends State<DriverScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => RideDetailsScreen(rideId: rideId, ride: ride),
+      ),
+    );
+  }
+
+  // فتح شاشة من القائمة الجانبية (نغلق القائمة أولاً)
+  void _go(Widget screen) {
+    Navigator.pop(context);
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+  }
+
+  Widget _drawerItem(IconData icon, String label, VoidCallback onTap,
+      {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? Colors.teal),
+      title: Text(label,
+          style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+      onTap: onTap,
+    );
+  }
+
+  // القائمة الجانبية: الخيارات
+  Widget _drawer() {
+    final user = FirebaseAuth.instance.currentUser;
+    final name =
+        (user?.displayName ?? '').isEmpty ? 'الكابتن' : user!.displayName!;
+    final email = user?.email ?? '';
+
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            margin: EdgeInsets.zero,
+            decoration: const BoxDecoration(color: Colors.teal),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white,
+                  child: Icon(Icons.person, color: Colors.teal, size: 34),
+                ),
+                const SizedBox(height: 10),
+                Text(name,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                Text(email,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+          _drawerItem(Icons.history, 'سجل رحلاتي',
+              () => _go(const DriverHistoryScreen())),
+          _drawerItem(Icons.notifications, 'الإشعارات',
+              () => _go(const NotificationsScreen(audience: 'drivers'))),
+          _drawerItem(Icons.account_balance_wallet, 'المحفظة والأرباح',
+              () => _go(const DriverWalletScreen())),
+          _drawerItem(Icons.person, 'الملف الشخصي',
+              () => _go(const DriverProfileScreen())),
+          _drawerItem(Icons.support_agent, 'تواصل معنا',
+              () => _go(const ContactUsScreen())),
+          const Divider(),
+          _drawerItem(
+            Icons.logout,
+            'تسجيل الخروج',
+            () async {
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+            color: Colors.red,
+          ),
+        ],
       ),
     );
   }
@@ -380,10 +461,12 @@ class _DriverScreenState extends State<DriverScreen> {
     }
 
     return Scaffold(
+      drawer: _drawer(),
       appBar: AppBar(
         title: const Text('لوحة السائق'),
         backgroundColor: Colors.teal,
         actions: [
+          const NotificationBell(audience: 'drivers'),
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             tooltip: 'المحفظة والأرباح',
@@ -393,27 +476,6 @@ class _DriverScreenState extends State<DriverScreen> {
                 MaterialPageRoute(
                     builder: (context) => const DriverWalletScreen()),
               );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            tooltip: 'الملف الشخصي',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const DriverProfileScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'تسجيل الخروج',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              }
             },
           ),
         ],
