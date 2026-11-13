@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'admin_screen.dart';
 import 'admin_payment_requests.dart';
+import 'admin_notifications.dart';
 
-// واجهة الإدارة: السائقون + طلبات السداد
+// واجهة الإدارة: السائقون + طلبات السداد + الإشعارات
 class AdminHome extends StatefulWidget {
   const AdminHome({Key? key}) : super(key: key);
 
@@ -21,6 +22,7 @@ class _AdminHomeState extends State<AdminHome> {
         children: const [
           AdminScreen(),
           PaymentRequestsView(),
+          AdminNotificationsView(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -31,6 +33,8 @@ class _AdminHomeState extends State<AdminHome> {
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'السائقون'),
           BottomNavigationBarItem(
               icon: Icon(Icons.sim_card), label: 'طلبات السداد'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.notifications), label: 'الإشعارات'),
         ],
       ),
     );
