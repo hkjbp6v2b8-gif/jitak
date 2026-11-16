@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,6 +7,7 @@ import 'pricing.dart';
 import 'live_ride_map.dart';
 import 'contact_buttons.dart';
 import 'trip_phase.dart';
+import 'request_config.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -19,7 +21,9 @@ class RideStatusScreen extends StatefulWidget {
 class _RideStatusScreenState extends State<RideStatusScreen> {
   bool _navigated = false;
   bool _arrivalShown = false;
+  bool _expiring = false;
   DateTime? _localArrival;
+  DateTime? _localStart;
 
   DocumentReference<Map<String, dynamic>> get _ref =>
       FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
@@ -27,17 +31,39 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   LatLng? _point(dynamic v) =>
       v is GeoPoint ? LatLng(v.latitude, v.longitude) : null;
 
+  void _snack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
   Future<void> _cancel() async {
     try {
       await _ref.update({
         'status': 'cancelled',
         'cancelledAt': FieldValue.serverTimestamp(),
+        'cancelReason': 'customer',
       });
     } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر إلغاء الرحلة، حاول مجدداً.')),
-      );
+      _snack('تعذر إلغاء الرحلة، حاول مجدداً.');
+    }
+  }
+
+  // انتهت مهلة الطلب: نلغيه إن كان ما زال "requested" (لا نلغي رحلة قُبلت للتو)
+  Future<void> _expire() async {
+    if (_expiring) return;
+    _expiring = true;
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(_ref);
+        if (snap.data()?['status'] != 'requested') return;
+        tx.update(_ref, {
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+          'cancelReason': 'timeout',
+        });
+      });
+    } catch (_) {
+      _expiring = false; // نعيد المحاولة في اللحظة التالية
     }
   }
 
@@ -261,6 +287,22 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
+  // البحث عن كابتن: عدّاد المهلة
+  Widget _requestedView(Map<String, dynamic> data, String details) {
+    final created = data['createdAt'];
+    final DateTime start = created is Timestamp
+        ? created.toDate()
+        : (_localStart ??= DateTime.now());
+
+    return _screen(
+      icon: _SearchCountdown(start: start, onExpire: _expire),
+      title: 'جارٍ البحث عن كابتن...',
+      subtitle:
+          'نعرض طلبك على الكباتن القريبين، وإن لم يقبله أحد خلال ${RequestConfig.timeoutSeconds} ثانية يُلغى تلقائياً.\n$details',
+      actions: [_cancelButton('إلغاء الطلب')],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -316,6 +358,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         }
 
         if (status == 'cancelled') {
+          // انتهت مهلة الطلب بلا كابتن
+          if (data['cancelReason'] == 'timeout') {
+            return _screen(
+              icon: const Icon(Icons.search_off, size: 90, color: Colors.orange),
+              title: 'لم يتوفر كابتن حالياً',
+              subtitle:
+                  'لم يقبل أحد طلبك خلال ${RequestConfig.timeoutSeconds} ثانية. جرّب مرة أخرى، فقد يتوفر كابتن قريب.',
+              actions: [_back('إعادة المحاولة')],
+            );
+          }
           return _screen(
             icon: const Icon(Icons.cancel_outlined, size: 90, color: Colors.red),
             title: 'تم إلغاء الرحلة',
@@ -329,17 +381,78 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         }
 
         // requested
-        return _screen(
-          icon: const SizedBox(
-            height: 70,
-            width: 70,
-            child: CircularProgressIndicator(strokeWidth: 5, color: Colors.teal),
-          ),
-          title: 'جارٍ البحث عن كابتن...',
-          subtitle: details,
-          actions: [_cancelButton('إلغاء الطلب')],
-        );
+        return _requestedView(data, details);
       },
+    );
+  }
+}
+
+// عدّاد دائري لمهلة الطلب: ينتهي فيُلغى الطلب تلقائياً
+class _SearchCountdown extends StatefulWidget {
+  final DateTime start;
+  final VoidCallback onExpire;
+
+  const _SearchCountdown({
+    Key? key,
+    required this.start,
+    required this.onExpire,
+  }) : super(key: key);
+
+  @override
+  State<_SearchCountdown> createState() => _SearchCountdownState();
+}
+
+class _SearchCountdownState extends State<_SearchCountdown> {
+  Timer? _timer;
+
+  int get _remaining =>
+      RequestConfig.timeoutSeconds -
+      DateTime.now().difference(widget.start).inSeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _remaining <= 0) widget.onExpire();
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+      if (_remaining <= 0) widget.onExpire();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _remaining.clamp(0, RequestConfig.timeoutSeconds);
+
+    return SizedBox(
+      height: 80,
+      width: 80,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            height: 80,
+            width: 80,
+            child: CircularProgressIndicator(
+              value: r / RequestConfig.timeoutSeconds,
+              strokeWidth: 6,
+              color: Colors.teal,
+              backgroundColor: Colors.grey.shade300,
+            ),
+          ),
+          Text('$r',
+              style:
+                  const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }
