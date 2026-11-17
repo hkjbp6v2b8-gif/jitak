@@ -20,6 +20,7 @@ class DriverMap extends StatefulWidget {
   final Color statusColor;
   final List<MapRequest> requests;
   final ValueChanged<String>? onRequestTap;
+  final ValueChanged<LatLng>? onLocation;
   final LatLng? pickup;
   final LatLng? destination;
 
@@ -29,6 +30,7 @@ class DriverMap extends StatefulWidget {
     required this.statusColor,
     this.requests = const [],
     this.onRequestTap,
+    this.onLocation,
     this.pickup,
     this.destination,
   }) : super(key: key);
@@ -113,6 +115,7 @@ class _DriverMapState extends State<DriverMap> {
       _me = position;
       _error = null;
     });
+    widget.onLocation?.call(position);
     if (!_centered) {
       _centered = true;
       try {
