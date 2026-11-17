@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -14,9 +15,18 @@ import 'driver_trip_controls.dart';
 import 'driver_history_screen.dart';
 import 'notifications_screen.dart';
 import 'contact_us_screen.dart';
+import 'request_config.dart';
 
 typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
+
+// طلب مفتوح ضمن نطاق السائق، مع بُعده عنه
+class _NearbyRequest {
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final double km;
+
+  const _NearbyRequest(this.doc, this.km);
+}
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -27,6 +37,9 @@ class DriverScreen extends StatefulWidget {
 
 class _DriverScreenState extends State<DriverScreen> {
   bool _isOnline = true;
+  LatLng? _me; // موقع السائق الحالي
+  Timer? _ticker;
+  bool _hasOpen = false;
 
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _activeStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _requestsStream;
@@ -45,6 +58,17 @@ class _DriverScreenState extends State<DriverScreen> {
         .snapshots();
     _requestsStream =
         _rides.where('status', isEqualTo: 'requested').snapshots();
+
+    // نحدّث الشاشة كل ثانيتين لإخفاء الطلبات التي انتهت مهلتها
+    _ticker = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted && _hasOpen) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
   }
 
   void _msg(String text) {
@@ -54,6 +78,43 @@ class _DriverScreenState extends State<DriverScreen> {
 
   LatLng? _point(dynamic v) =>
       v is GeoPoint ? LatLng(v.latitude, v.longitude) : null;
+
+  // موقع السائق من الخريطة (نحدّث عند التحرك أكثر من 30 متراً)
+  void _onLocation(LatLng p) {
+    final last = _me;
+    if (last == null || const Distance().as(LengthUnit.Meter, last, p) > 30) {
+      setState(() => _me = p);
+    }
+  }
+
+  // الطلبات المفتوحة: ضمن نصف القطر، ولم تنتهِ مهلتها، مرتبة بالأقرب
+  List<_NearbyRequest> _nearby(_Docs docs) {
+    final me = _me;
+    if (me == null) return [];
+
+    final now = DateTime.now();
+    final result = <_NearbyRequest>[];
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final pickup = _point(data['pickup']);
+      if (pickup == null) continue;
+
+      final created = data['createdAt'];
+      if (created is Timestamp) {
+        final age = now.difference(created.toDate()).inSeconds;
+        if (age > RequestConfig.timeoutSeconds + 2) continue;
+      }
+
+      final km = const Distance().as(LengthUnit.Kilometer, me, pickup);
+      if (km > RequestConfig.radiusKm) continue;
+
+      result.add(_NearbyRequest(doc, km));
+    }
+
+    result.sort((a, b) => a.km.compareTo(b.km));
+    return result;
+  }
 
   // إنهاء الرحلة ثم فتح شاشة تقييم العميل
   Future<void> _complete(String rideId, Map<String, dynamic> ride) async {
@@ -169,9 +230,10 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // بطاقة المحفظة: المستحق للشركة من رحلاتك الفعلية
+  // بطاقة المحفظة: الرصيد أو المستحق للشركة
   Widget _walletCard(WalletData w, bool blocked) {
-    final color = blocked ? Colors.red : Colors.teal;
+    final hasCredit = w.ready && w.credit > 0;
+    final color = blocked ? Colors.red : (hasCredit ? Colors.green : Colors.teal);
     final limit = WalletConfig.debtLimit;
     final rate = (WalletConfig.commissionRate * 100).round();
 
@@ -180,18 +242,24 @@ class _DriverScreenState extends State<DriverScreen> {
       info = 'جارٍ تحميل المحفظة...';
     } else if (w.error) {
       info = 'تعذر تحميل المحفظة. تحقق من الاتصال.';
-    } else {
+    } else if (w.credit > 0) {
+      info =
+          'رصيدك: +${w.credit.toStringAsFixed(1)} د.ل (تُخصم منه عمولة رحلاتك تلقائياً)';
+    } else if (w.debt > 0) {
       info =
           'المستحق للشركة (عمولة $rate%): ${w.debt.toStringAsFixed(1)} د.ل من ${limit.toStringAsFixed(0)} د.ل';
+    } else {
+      info = 'لا مستحقات عليك حالياً.';
     }
 
     return Card(
       elevation: 2,
-      color: blocked ? Colors.red.shade50 : Colors.teal.shade50,
+      color: blocked
+          ? Colors.red.shade50
+          : (hasCredit ? Colors.green.shade50 : Colors.teal.shade50),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: blocked ? Colors.red : Colors.teal.shade200, width: 1.2),
+        side: BorderSide(color: color.withOpacity(0.5), width: 1.2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -295,16 +363,16 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  Widget _requestTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final ride = doc.data();
+  Widget _requestTile(_NearbyRequest r) {
+    final ride = r.doc.data();
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
     final km = (ride['distanceKm'] as num?)?.toDouble();
-    final kmText = km == null ? '' : '${km.toStringAsFixed(1)} كم • ';
+    final tripKm = km == null ? '' : 'رحلة ${km.toStringAsFixed(1)} كم • ';
 
     return Card(
       elevation: 2,
       child: ListTile(
-        onTap: () => _openDetails(doc.id, ride),
+        onTap: () => _openDetails(r.doc.id, ride),
         leading: const CircleAvatar(
           backgroundColor: Colors.tealAccent,
           child: Icon(Icons.person, color: Colors.teal),
@@ -312,9 +380,10 @@ class _DriverScreenState extends State<DriverScreen> {
         title: Text('رحلة إلى: ${(ride['destination'] ?? '').toString()}',
             style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(
-            '$kmText${Pricing.format(fare)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+            'العميل يبعد عنك ${r.km.toStringAsFixed(1)} كم\n$tripKm${Pricing.format(fare)} د.ل • ${(ride['paymentMethod'] ?? '').toString()}'),
+        isThreeLine: true,
         trailing: ElevatedButton(
-          onPressed: () => _openDetails(doc.id, ride),
+          onPressed: () => _openDetails(r.doc.id, ride),
           style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
           child: const Text('عرض', style: TextStyle(color: Colors.white)),
         ),
@@ -322,10 +391,14 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // محتوى اللوحة السفلية: الرحلة الجارية، أو الطلبات المفتوحة
+  Widget _note(Widget child) {
+    return Padding(padding: const EdgeInsets.all(24), child: Center(child: child));
+  }
+
+  // محتوى اللوحة السفلية: الرحلة الجارية، أو الطلبات القريبة
   List<Widget> _ridesSection(
     _Docs activeDocs,
-    _Docs openDocs,
+    List<_NearbyRequest> nearby,
     _Snap open,
     bool blocked,
   ) {
@@ -357,43 +430,38 @@ class _DriverScreenState extends State<DriverScreen> {
 
     if (open.hasError) {
       return [
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(
-            child: Text('تعذر تحميل الطلبات. تحقق من الاتصال.',
-                style: TextStyle(color: Colors.grey)),
-          ),
-        ),
+        _note(const Text('تعذر تحميل الطلبات. تحقق من الاتصال.',
+            style: TextStyle(color: Colors.grey))),
       ];
     }
     if (!open.hasData) {
       return [
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator(color: Colors.teal)),
-        ),
+        _note(const CircularProgressIndicator(color: Colors.teal)),
       ];
     }
-    if (openDocs.isEmpty) {
+    if (_me == null) {
       return [
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              'لا توجد طلبات حالياً. سيظهر أي طلب جديد هنا وعلى الخريطة فوراً.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ),
+        _note(const Text('جارٍ تحديد موقعك لعرض الطلبات القريبة منك...',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey))),
+      ];
+    }
+    if (nearby.isEmpty) {
+      return [
+        _note(Text(
+          'لا توجد طلبات ضمن ${RequestConfig.radiusKm.toStringAsFixed(0)} كم منك حالياً. سيظهر أي طلب جديد قريب هنا وعلى الخريطة فوراً.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.grey),
+        )),
       ];
     }
 
     return [
-      const Text('الطلبات القريبة المتاحة:',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      Text(
+          'الطلبات ضمن ${RequestConfig.radiusKm.toStringAsFixed(0)} كم منك:',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
-      ...openDocs.map(_requestTile),
+      ...nearby.map(_requestTile),
     ];
   }
 
@@ -421,25 +489,19 @@ class _DriverScreenState extends State<DriverScreen> {
     final _Docs activeDocs = active.data?.docs ?? [];
     final bool hasActive = activeDocs.isNotEmpty;
 
-    final _Docs openDocs = (open.data?.docs ?? []).toList();
-    openDocs.sort((a, b) {
-      final ta = a.data()['createdAt'] as Timestamp?;
-      final tb = b.data()['createdAt'] as Timestamp?;
-      if (ta == null || tb == null) return 0;
-      return tb.compareTo(ta);
-    });
+    final _Docs openDocs = open.data?.docs ?? [];
+    _hasOpen = openDocs.isNotEmpty;
 
     final bool showRequests = !hasActive && _isOnline && !blocked;
+    final nearby = showRequests ? _nearby(openDocs) : <_NearbyRequest>[];
 
-    // دبابيس الطلبات على الخريطة
+    // دبابيس الطلبات القريبة على الخريطة
     final markers = <MapRequest>[];
-    if (showRequests) {
-      for (final doc in openDocs) {
-        final point = _point(doc.data()['pickup']);
-        if (point == null) continue;
-        final fare = (doc.data()['fare'] as num?)?.toDouble() ?? 0.0;
-        markers.add(MapRequest(doc.id, point, '${Pricing.format(fare)} د.ل'));
-      }
+    for (final r in nearby) {
+      final point = _point(r.doc.data()['pickup']);
+      if (point == null) continue;
+      final fare = (r.doc.data()['fare'] as num?)?.toDouble() ?? 0.0;
+      markers.add(MapRequest(r.doc.id, point, '${Pricing.format(fare)} د.ل'));
     }
 
     final activeRide = hasActive ? activeDocs.first.data() : null;
@@ -487,10 +549,11 @@ class _DriverScreenState extends State<DriverScreen> {
               statusText: statusText,
               statusColor: statusColor,
               requests: markers,
+              onLocation: _onLocation,
               onRequestTap: (id) {
-                for (final doc in openDocs) {
-                  if (doc.id == id) {
-                    _openDetails(doc.id, doc.data());
+                for (final r in nearby) {
+                  if (r.doc.id == id) {
+                    _openDetails(r.doc.id, r.doc.data());
                     return;
                   }
                 }
@@ -534,7 +597,7 @@ class _DriverScreenState extends State<DriverScreen> {
                       subtitle: Text(blocked
                           ? 'متوقف تلقائياً بسبب المستحقات'
                           : (_isOnline
-                              ? 'تظهر لك الطلبات على الخريطة'
+                              ? 'تظهر لك الطلبات القريبة على الخريطة'
                               : 'لن تصلك طلبات')),
                       value: blocked ? false : _isOnline,
                       activeColor: Colors.teal,
@@ -543,7 +606,7 @@ class _DriverScreenState extends State<DriverScreen> {
                     ),
                     _walletCard(wallet, blocked),
                     const SizedBox(height: 12),
-                    ..._ridesSection(activeDocs, openDocs, open, blocked),
+                    ..._ridesSection(activeDocs, nearby, open, blocked),
                   ],
                 ),
               );
