@@ -35,11 +35,11 @@ class WalletData {
   double get netToday => grossToday * (1 - WalletConfig.commissionRate);
   double get netWeek => grossWeek * (1 - WalletConfig.commissionRate);
 
-  // المستحق للشركة بعد خصم ما دُفع
-  double get debt {
-    final value = commissionTotal - paidTotal;
-    return value > 0 ? value : 0;
-  }
+  // الرصيد = ما دفعه السائق - عمولات رحلاته
+  // موجب: رصيد له تُخصم منه عمولات رحلاته، وسالب: دين عليه
+  double get balance => paidTotal - commissionTotal;
+  double get credit => balance > 0 ? balance : 0;
+  double get debt => balance < 0 ? -balance : 0;
 
   factory WalletData.from(
     List<Map<String, dynamic>> rides,
