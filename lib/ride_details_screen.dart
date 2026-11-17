@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 import 'ride_map.dart';
 import 'pricing.dart';
+import 'request_config.dart';
 
 // تفاصيل الطلب للسائق قبل القبول
 class RideDetailsScreen extends StatefulWidget {
@@ -22,6 +24,29 @@ class RideDetailsScreen extends StatefulWidget {
 
 class _RideDetailsScreenState extends State<RideDetailsScreen> {
   bool _loading = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  // الثواني المتبقية من مهلة الطلب (null إن لم يُعرف وقت الإنشاء)
+  int? get _remaining {
+    final created = widget.ride['createdAt'];
+    if (created is! Timestamp) return null;
+    return RequestConfig.timeoutSeconds -
+        DateTime.now().difference(created.toDate()).inSeconds;
+  }
 
   LatLng? _point(dynamic value) {
     if (value is GeoPoint) return LatLng(value.latitude, value.longitude);
@@ -51,7 +76,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('تعذر قبول الرحلة (ربما قبلها سائق آخر).')),
+            content: Text(
+                'تعذر قبول الرحلة: ربما قبلها سائق آخر أو انتهت مهلتها.')),
       );
       setState(() => _loading = false);
     }
@@ -72,6 +98,38 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
   }
 
+  // شريط مهلة الطلب
+  Widget _timeoutBanner(int? remaining) {
+    if (remaining == null) return const SizedBox.shrink();
+
+    final expired = remaining <= 0;
+    final color = expired ? Colors.red : Colors.orange.shade800;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(expired ? Icons.timer_off : Icons.timer, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              expired
+                  ? 'انتهت مهلة هذا الطلب.'
+                  : 'ينتهي هذا الطلب خلال $remaining ثانية، اقبله بسرعة.',
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ride = widget.ride;
@@ -79,6 +137,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     final destination = _point(ride['destinationPoint']);
     final fare = (ride['fare'] as num?)?.toDouble() ?? 0.0;
     final km = (ride['distanceKm'] as num?)?.toDouble();
+    final remaining = _remaining;
+    final expired = remaining != null && remaining <= 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -88,6 +148,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _timeoutBanner(remaining),
           if (pickup != null && destination != null)
             RideMap(
               key: ValueKey(widget.rideId),
@@ -135,7 +196,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _loading ? null : _accept,
+            onPressed: (_loading || expired) ? null : _accept,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -150,8 +211,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('قبول الرحلة',
-                    style: TextStyle(
+                : Text(expired ? 'انتهت المهلة' : 'قبول الرحلة',
+                    style: const TextStyle(
                         fontSize: 16,
                         color: Colors.white,
                         fontWeight: FontWeight.bold)),
