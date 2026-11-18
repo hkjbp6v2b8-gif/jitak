@@ -51,7 +51,25 @@ class DriverWalletScreen extends StatelessWidget {
           }
 
           final blocked = w.debt >= limit;
-          final color = blocked ? Colors.red : Colors.teal;
+          final hasCredit = w.credit > 0;
+          final color =
+              blocked ? Colors.red : (hasCredit ? Colors.green : Colors.teal);
+
+          final String title;
+          final String value;
+          final String hint;
+          if (hasCredit) {
+            title = 'رصيدك';
+            value = '+${w.credit.toStringAsFixed(1)} د.ل';
+            hint =
+                'تُخصم عمولة كل رحلة من رصيدك تلقائياً. وإن نفد صارت دَيناً عليك (الحد الأقصى ${limit.toStringAsFixed(0)} د.ل).';
+          } else {
+            title = 'المستحق للشركة (عمولة $rate%)';
+            value = '${w.debt.toStringAsFixed(1)} د.ل';
+            hint = blocked
+                ? 'بلغ المستحق الحد الأقصى (${limit.toStringAsFixed(0)} د.ل). سدّد ليُعاد تفعيل استقبال الطلبات.'
+                : 'الحد الأقصى للدين ${limit.toStringAsFixed(0)} د.ل.';
+          }
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -95,32 +113,40 @@ class DriverWalletScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Card(
                 elevation: 3,
-                color: blocked ? Colors.red.shade50 : Colors.white,
+                color: blocked
+                    ? Colors.red.shade50
+                    : (hasCredit ? Colors.green.shade50 : Colors.white),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                      color: blocked ? Colors.red : Colors.grey.shade300),
+                      color: blocked
+                          ? Colors.red
+                          : (hasCredit
+                              ? Colors.green
+                              : Colors.grey.shade300)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('المستحق للشركة (عمولة $rate%)',
+                      Text(title,
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 8),
-                      Text('${w.debt.toStringAsFixed(1)} د.ل',
+                      Text(value,
                           style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
                               color: color)),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: (w.debt / limit).clamp(0.0, 1.0).toDouble(),
-                        backgroundColor: Colors.grey.shade300,
-                        color: color,
-                      ),
+                      if (!hasCredit) ...[
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: (w.debt / limit).clamp(0.0, 1.0).toDouble(),
+                          backgroundColor: Colors.grey.shade300,
+                          color: color,
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Text(
                         'إجمالي العمولة: ${w.commissionTotal.toStringAsFixed(1)} د.ل  •  المدفوع: ${w.paidTotal.toStringAsFixed(1)} د.ل',
@@ -128,22 +154,17 @@ class DriverWalletScreen extends StatelessWidget {
                             const TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        blocked
-                            ? 'بلغ المستحق الحد الأقصى (${limit.toStringAsFixed(0)} د.ل). سدّد ليُعاد تفعيل استقبال الطلبات.'
-                            : 'الحد الأقصى للدين ${limit.toStringAsFixed(0)} د.ل.',
-                        style: TextStyle(
-                            color: blocked ? Colors.red : Colors.grey,
-                            fontSize: 12),
-                      ),
+                      Text(hint,
+                          style: TextStyle(
+                              color: blocked ? Colors.red : Colors.grey,
+                              fontSize: 12)),
                       const SizedBox(height: 12),
                       ElevatedButton.icon(
-                        onPressed: w.debt > 0
-                            ? () => showPayDialog(context, debt: w.debt)
-                            : null,
+                        onPressed: () =>
+                            showPayDialog(context, debt: w.debt),
                         icon: const Icon(Icons.sim_card,
                             color: Colors.white, size: 18),
-                        label: const Text('سداد المستحقات بكرت شحن',
+                        label: const Text('سداد بكرت شحن',
                             style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: color,
@@ -180,9 +201,9 @@ class DriverWalletScreen extends StatelessWidget {
                       title: Text(note.isEmpty ? 'دفعة للشركة' : note,
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(_date(p['createdAt'])),
-                      trailing: Text('- ${amount.toStringAsFixed(1)} د.ل',
+                      trailing: Text('+ ${amount.toStringAsFixed(1)} د.ل',
                           style: const TextStyle(
-                              color: Colors.teal,
+                              color: Colors.green,
                               fontWeight: FontWeight.bold)),
                     ),
                   );
@@ -242,7 +263,7 @@ class _RequestsListState extends State<_RequestsList> {
               final String statusText;
               final Color statusColor;
               if (status == 'approved') {
-                statusText = 'تم الخصم';
+                statusText = 'تمت الإضافة لرصيدك';
                 statusColor = Colors.green;
               } else if (status == 'rejected') {
                 statusText = 'مرفوض';
@@ -262,9 +283,9 @@ class _RequestsListState extends State<_RequestsList> {
                   subtitle: Text('${_date(r['createdAt'])}  •  $statusText',
                       style: TextStyle(color: statusColor, fontSize: 12)),
                   trailing: status == 'approved' && amount != null
-                      ? Text('- ${amount.toStringAsFixed(1)} د.ل',
+                      ? Text('+ ${amount.toStringAsFixed(1)} د.ل',
                           style: const TextStyle(
-                              color: Colors.teal,
+                              color: Colors.green,
                               fontWeight: FontWeight.bold))
                       : null,
                 ),
