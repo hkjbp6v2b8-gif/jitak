@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'contact_us_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -161,6 +162,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
                 const Divider(height: 36),
+                ListTile(
+                  leading: const Icon(Icons.support_agent, color: Colors.teal),
+                  title: const Text('المساعدة وتواصل معنا'),
+                  subtitle: const Text('أبلغ عن مشكلة وتابع ردّ الدعم'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const ContactUsScreen(role: 'customer'),
+                      ),
+                    );
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.lock_reset, color: Colors.teal),
                   title: const Text('تغيير كلمة المرور'),
