@@ -26,7 +26,7 @@ class AdminScreen extends StatelessWidget {
     }
   }
 
-  // تسجيل دفعة من السائق للشركة (تنقص مستحقاته)
+  // تسجيل دفعة من السائق للشركة (تزيد رصيده)
   Future<void> _recordPayment(
     BuildContext context,
     String driverId,
@@ -115,7 +115,7 @@ class AdminScreen extends StatelessWidget {
     );
   }
 
-  // أزرار السائق المفعّل: المستحق + تسجيل دفعة + إيقاف
+  // أزرار السائق المفعّل: الرصيد أو المستحق + تسجيل دفعة + إيقاف
   Widget _approvedActions(
     BuildContext context,
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -123,15 +123,19 @@ class AdminScreen extends StatelessWidget {
   ) {
     final name = (doc.data()['name'] ?? '').toString();
     final blocked = w.ready && w.debt >= WalletConfig.debtLimit;
+    final hasCredit = w.ready && w.credit > 0;
 
     final String summary;
     if (w.loading) {
-      summary = 'جارٍ حساب المستحقات...';
+      summary = 'جارٍ حساب الرصيد...';
     } else if (w.error) {
-      summary = 'تعذر حساب المستحقات.';
+      summary = 'تعذر حساب الرصيد.';
     } else {
+      final balance = hasCredit
+          ? 'رصيد السائق: +${w.credit.toStringAsFixed(1)} د.ل'
+          : 'المستحق للشركة: ${w.debt.toStringAsFixed(1)} د.ل';
       summary =
-          'المستحق للشركة: ${w.debt.toStringAsFixed(1)} د.ل  •  المدفوع: ${w.paidTotal.toStringAsFixed(1)} د.ل  •  الرحلات: ${w.tripsTotal}';
+          '$balance  •  المدفوع: ${w.paidTotal.toStringAsFixed(1)} د.ل  •  الرحلات: ${w.tripsTotal}';
     }
 
     return Column(
@@ -140,7 +144,9 @@ class AdminScreen extends StatelessWidget {
         Text(
           summary,
           style: TextStyle(
-            color: blocked ? Colors.red : Colors.black87,
+            color: blocked
+                ? Colors.red
+                : (hasCredit ? Colors.green.shade700 : Colors.black87),
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
