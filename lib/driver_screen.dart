@@ -16,6 +16,7 @@ import 'driver_history_screen.dart';
 import 'notifications_screen.dart';
 import 'contact_us_screen.dart';
 import 'request_config.dart';
+import 'sound_service.dart';
 
 typedef _Docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 typedef _Snap = AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>>;
@@ -40,6 +41,9 @@ class _DriverScreenState extends State<DriverScreen> {
   LatLng? _me; // موقع السائق الحالي
   Timer? _ticker;
   bool _hasOpen = false;
+
+  // الطلبات التي نبّهنا السائق إليها (لتنبيه الجديد فقط)
+  final Set<String> _knownRequests = {};
 
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _activeStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _requestsStream;
@@ -68,6 +72,7 @@ class _DriverScreenState extends State<DriverScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    SoundService.disable();
     super.dispose();
   }
 
@@ -227,6 +232,61 @@ class _DriverScreenState extends State<DriverScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // تفعيل/تجربة صوت تنبيه الطلبات
+  Widget _soundBanner() {
+    if (!SoundService.enabled) {
+      return Card(
+        color: Colors.orange.shade50,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.orange.shade300),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              const Icon(Icons.volume_off, color: Colors.orange),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('صوت التنبيه غير مفعّل. فعّله لتسمع الطلبات الجديدة.',
+                    style: TextStyle(fontSize: 12)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await SoundService.enable();
+                  if (mounted) setState(() {});
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('تفعيل',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.volume_up, color: Colors.teal, size: 20),
+        const SizedBox(width: 6),
+        const Expanded(
+          child: Text('صوت التنبيه مفعّل',
+              style: TextStyle(color: Colors.teal, fontSize: 13)),
+        ),
+        TextButton(onPressed: SoundService.test, child: const Text('تجربة')),
+        TextButton(
+          onPressed: () {
+            SoundService.disable();
+            setState(() {});
+          },
+          child: const Text('إيقاف', style: TextStyle(color: Colors.grey)),
+        ),
+      ],
     );
   }
 
@@ -495,6 +555,16 @@ class _DriverScreenState extends State<DriverScreen> {
     final bool showRequests = !hasActive && _isOnline && !blocked;
     final nearby = showRequests ? _nearby(openDocs) : <_NearbyRequest>[];
 
+    // صوت تنبيه عند ظهور طلب قريب جديد
+    final currentIds = nearby.map((r) => r.doc.id).toSet();
+    final fresh = currentIds.difference(_knownRequests);
+    _knownRequests
+      ..clear()
+      ..addAll(currentIds);
+    if (fresh.isNotEmpty && SoundService.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => SoundService.notify());
+    }
+
     // دبابيس الطلبات القريبة على الخريطة
     final markers = <MapRequest>[];
     for (final r in nearby) {
@@ -604,6 +674,8 @@ class _DriverScreenState extends State<DriverScreen> {
                       onChanged:
                           blocked ? null : (v) => setState(() => _isOnline = v),
                     ),
+                    _soundBanner(),
+                    const SizedBox(height: 8),
                     _walletCard(wallet, blocked),
                     const SizedBox(height: 12),
                     ..._ridesSection(activeDocs, nearby, open, blocked),
