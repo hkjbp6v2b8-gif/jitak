@@ -3,15 +3,21 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 
-// صوت تنبيه الطلبات الجديدة (يُولَّد برمجياً، بلا ملفات صوتية)
+// صوت تنبيه الطلبات الجديدة: ملفك إن وُجد، وإلا رنين مولَّد برمجياً
 class SoundService {
+  // مسار ملفك داخل مجلد assets (غيّر الاسم هنا إن كان امتداده مختلفاً)
+  static const String assetPath = 'sounds/request.mp3';
+
   static final AudioPlayer _player = AudioPlayer();
   static String? _uri;
+
+  // false: نستخدم الرنين المولَّد (عند تعذر ملفك)
+  static bool _useFile = true;
 
   // يتفعل بضغطة من المستخدم (شرط المتصفح)، ويُنسى عند تحديث الصفحة
   static bool enabled = false;
 
-  // رنين: نغمتان مكررتان
+  // رنين احتياطي: نغمتان مكررتان
   static Uint8List _wav() {
     const rate = 22050;
     final samples = <int>[];
@@ -62,14 +68,25 @@ class SoundService {
     return data.buffer.asUint8List();
   }
 
-  static String get _source =>
+  static String get _fallbackSource =>
       _uri ??= 'data:audio/wav;base64,${base64Encode(_wav())}';
 
   static Future<void> _play() async {
     try {
       await _player.stop();
       await _player.setVolume(1.0);
-      await _player.play(UrlSource(_source));
+
+      if (_useFile) {
+        try {
+          await _player.play(AssetSource(assetPath));
+          return;
+        } catch (_) {
+          // ملفك غير موجود أو تعذر تشغيله: نستخدم الرنين الاحتياطي
+          _useFile = false;
+        }
+      }
+
+      await _player.play(UrlSource(_fallbackSource));
     } catch (_) {
       // قد يمنع المتصفح الصوت: نتجاهل بصمت
     }
