@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 // صوت تنبيه الطلبات الجديدة: ملفك إن وُجد، وإلا رنين مولَّد برمجياً
@@ -9,21 +10,25 @@ class SoundService {
   static const String assetPath = 'sounds/request.mp3';
 
   static final AudioPlayer _player = AudioPlayer();
-  static String? _uri;
+  static String? _fallbackUri;
+  static String? _silentUri;
 
   // false: نستخدم الرنين المولَّد (عند تعذر ملفك)
   static bool _useFile = true;
 
-  // يتفعل بضغطة من المستخدم (شرط المتصفح)، ويُنسى عند تحديث الصفحة
-  static bool enabled = false;
+  // يصبح true بعد أول لمسة للشاشة (شرط المتصفح لتشغيل الصوت)
+  static final ValueNotifier<bool> unlockedNotifier =
+      ValueNotifier<bool>(false);
+  static bool get unlocked => unlockedNotifier.value;
 
-  // رنين احتياطي: نغمتان مكررتان
-  static Uint8List _wav() {
+  // يبني ملف WAV من نغمات: [التردد، المدة بالثواني] (التردد 0 = صمت)
+  static Uint8List _buildWav(List<List<double>> tones) {
     const rate = 22050;
     final samples = <int>[];
 
-    void tone(double freq, double seconds) {
-      final n = (rate * seconds).round();
+    for (final t in tones) {
+      final freq = t[0];
+      final n = (rate * t[1]).round();
       for (var i = 0; i < n; i++) {
         final fadeIn = math.min(1.0, i / (rate * 0.01));
         final fadeOut = math.min(1.0, (n - i) / (rate * 0.04));
@@ -32,12 +37,6 @@ class SoundService {
         samples.add((v * 32767).round());
       }
     }
-
-    tone(880, 0.20);
-    tone(1175, 0.30);
-    tone(0, 0.12);
-    tone(880, 0.20);
-    tone(1175, 0.40);
 
     final bytes = samples.length * 2;
     final data = ByteData(44 + bytes);
@@ -68,8 +67,30 @@ class SoundService {
     return data.buffer.asUint8List();
   }
 
-  static String get _fallbackSource =>
-      _uri ??= 'data:audio/wav;base64,${base64Encode(_wav())}';
+  // الرنين الاحتياطي: نغمتان مكررتان
+  static String get _fallbackSource => _fallbackUri ??=
+      'data:audio/wav;base64,${base64Encode(_buildWav(<List<double>>[
+        [880, 0.20],
+        [1175, 0.30],
+        [0, 0.12],
+        [880, 0.20],
+        [1175, 0.40],
+      ]))}';
+
+  // مقطع صامت قصير لفتح الصوت عند أول لمسة بلا أي صوت مسموع
+  static String get _silentSource => _silentUri ??=
+      'data:audio/wav;base64,${base64Encode(_buildWav(<List<double>>[
+        [0, 0.10],
+      ]))}';
+
+  // يُستدعى عند أول لمسة في أي مكان بالتطبيق: يفتح الصوت للمتصفح
+  static Future<void> unlock() async {
+    if (unlocked) return;
+    unlockedNotifier.value = true;
+    try {
+      await _player.play(UrlSource(_silentSource));
+    } catch (_) {}
+  }
 
   static Future<void> _play() async {
     try {
@@ -92,23 +113,10 @@ class SoundService {
     }
   }
 
-  // يُستدعى من زر "تفعيل الصوت" (ضغطة المستخدم تفتح الصوت)
-  static Future<void> enable() async {
-    enabled = true;
-    await _play();
-  }
-
-  static void disable() {
-    enabled = false;
-    _player.stop();
-  }
-
-  // تجربة الصوت
+  // تجربة الصوت (من القائمة الجانبية)
   static Future<void> test() => _play();
 
   // عند وصول طلب جديد
-  static Future<void> notify() async {
-    if (enabled) await _play();
-  }
+  static Future<void> notify() => _play();
 }
 // نهاية الملف
