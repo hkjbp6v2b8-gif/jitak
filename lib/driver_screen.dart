@@ -72,7 +72,6 @@ class _DriverScreenState extends State<DriverScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
-    SoundService.disable();
     super.dispose();
   }
 
@@ -218,6 +217,9 @@ class _DriverScreenState extends State<DriverScreen> {
               () => _go(const DriverProfileScreen())),
           _drawerItem(Icons.support_agent, 'تواصل معنا',
               () => _go(const ContactUsScreen())),
+          _drawerItem(Icons.volume_up, 'تجربة صوت التنبيه', () {
+            SoundService.test();
+          }),
           const Divider(),
           _drawerItem(
             Icons.logout,
@@ -235,58 +237,28 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
-  // تفعيل/تجربة صوت تنبيه الطلبات
-  Widget _soundBanner() {
-    if (!SoundService.enabled) {
-      return Card(
-        color: Colors.orange.shade50,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.orange.shade300),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
+  // تلميح يظهر قبل أول لمسة فقط (المتصفح يمنع الصوت حتى تلمس الشاشة)
+  Widget _soundHint() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: SoundService.unlockedNotifier,
+      builder: (context, unlocked, _) {
+        if (unlocked) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
           child: Row(
             children: [
-              const Icon(Icons.volume_off, color: Colors.orange),
+              Icon(Icons.touch_app, color: Colors.orange.shade800, size: 20),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('صوت التنبيه غير مفعّل. فعّله لتسمع الطلبات الجديدة.',
-                    style: TextStyle(fontSize: 12)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await SoundService.enable();
-                  if (mounted) setState(() {});
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                child: const Text('تفعيل',
-                    style: TextStyle(color: Colors.white)),
+                child: Text(
+                  'المس أي مكان في الشاشة لتفعيل صوت التنبيه.',
+                  style: TextStyle(fontSize: 12, color: Colors.orange),
+                ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        const Icon(Icons.volume_up, color: Colors.teal, size: 20),
-        const SizedBox(width: 6),
-        const Expanded(
-          child: Text('صوت التنبيه مفعّل',
-              style: TextStyle(color: Colors.teal, fontSize: 13)),
-        ),
-        TextButton(onPressed: SoundService.test, child: const Text('تجربة')),
-        TextButton(
-          onPressed: () {
-            SoundService.disable();
-            setState(() {});
-          },
-          child: const Text('إيقاف', style: TextStyle(color: Colors.grey)),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -561,7 +533,7 @@ class _DriverScreenState extends State<DriverScreen> {
     _knownRequests
       ..clear()
       ..addAll(currentIds);
-    if (fresh.isNotEmpty && SoundService.enabled) {
+    if (fresh.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => SoundService.notify());
     }
 
@@ -674,8 +646,7 @@ class _DriverScreenState extends State<DriverScreen> {
                       onChanged:
                           blocked ? null : (v) => setState(() => _isOnline = v),
                     ),
-                    _soundBanner(),
-                    const SizedBox(height: 8),
+                    _soundHint(),
                     _walletCard(wallet, blocked),
                     const SizedBox(height: 12),
                     ..._ridesSection(activeDocs, nearby, open, blocked),
