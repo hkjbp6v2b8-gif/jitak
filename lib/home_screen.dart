@@ -11,6 +11,7 @@ import 'routing_service.dart';
 import 'fare_card.dart';
 import 'geocoding_service.dart';
 import 'place_search_box.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -192,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('اطلب مشوارك'),
         backgroundColor: Colors.teal,
         actions: [
+          const NotificationBell(audience: 'customers'),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'تاريخ الرحلات',
