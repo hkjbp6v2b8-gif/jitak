@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// تبويب الإدارة: إرسال إشعار للسائقين واستعراض ما أُرسل
+// تبويب الإدارة: إرسال إشعار للسائقين أو العملاء واستعراض ما أُرسل
 class AdminNotificationsView extends StatefulWidget {
   const AdminNotificationsView({Key? key}) : super(key: key);
 
@@ -14,9 +14,12 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
   bool _sending = false;
+  String _audience = 'drivers';
 
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
       FirebaseFirestore.instance.collection('announcements').snapshots();
+
+  String get _audienceLabel => _audience == 'drivers' ? 'السائقين' : 'العملاء';
 
   @override
   void dispose() {
@@ -59,7 +62,8 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
       _snack('اكتب العنوان والنص.');
       return;
     }
-    if (!await _confirm('إرسال الإشعار', 'سيصل إلى جميع السائقين. متابعة؟')) {
+    if (!await _confirm(
+        'إرسال الإشعار', 'سيصل إلى جميع $_audienceLabel. متابعة؟')) {
       return;
     }
 
@@ -68,12 +72,12 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
       await FirebaseFirestore.instance.collection('announcements').add({
         'title': title,
         'body': body,
-        'audience': 'drivers',
+        'audience': _audience,
         'createdAt': FieldValue.serverTimestamp(),
       });
       _title.clear();
       _body.clear();
-      _snack('تم إرسال الإشعار للسائقين.');
+      _snack('تم إرسال الإشعار إلى $_audienceLabel.');
     } catch (_) {
       _snack('تعذر إرسال الإشعار، حاول مجدداً.');
     } finally {
@@ -82,7 +86,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   }
 
   Future<void> _delete(DocumentReference<Map<String, dynamic>> ref) async {
-    if (!await _confirm('حذف الإشعار', 'سيختفي من عند السائقين. متابعة؟')) {
+    if (!await _confirm('حذف الإشعار', 'سيختفي من عند المستخدمين. متابعة؟')) {
       return;
     }
     try {
@@ -110,7 +114,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إشعارات السائقين'),
+        title: const Text('إشعارات التطبيق'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
@@ -134,6 +138,25 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Text('إلى: '),
+                      const SizedBox(width: 6),
+                      ChoiceChip(
+                        label: const Text('السائقون'),
+                        selected: _audience == 'drivers',
+                        onSelected: (_) =>
+                            setState(() => _audience = 'drivers'),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('العملاء'),
+                        selected: _audience == 'customers',
+                        onSelected: (_) =>
+                            setState(() => _audience = 'customers'),
+                      ),
+                    ],
+                  ),
                   TextField(
                     controller: _title,
                     maxLength: 100,
@@ -157,8 +180,8 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                 strokeWidth: 2, color: Colors.white),
                           )
                         : const Icon(Icons.send, color: Colors.white),
-                    label: const Text('إرسال لجميع السائقين',
-                        style: TextStyle(color: Colors.white)),
+                    label: Text('إرسال لجميع $_audienceLabel',
+                        style: const TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                       minimumSize: const Size(double.infinity, 44),
