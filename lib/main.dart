@@ -9,6 +9,7 @@ import 'driver_screen.dart';
 import 'driver_pending_screen.dart';
 import 'admin_config.dart';
 import 'admin_home.dart';
+import 'sound_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,11 +40,15 @@ class JitakApp extends StatelessWidget {
           ),
         ),
       ),
-      // اتجاه التطبيق من اليمين لليسار
+      // اتجاه التطبيق من اليمين لليسار + فتح الصوت عند أول لمسة
       builder: (context, child) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: child!,
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => SoundService.unlock(),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
         );
       },
       home: const AuthGate(),
